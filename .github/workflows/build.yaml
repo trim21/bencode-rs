@@ -1,0 +1,15 @@
+name: Build Wheels
+
+on:
+  push:
+    branches:
+      - main
+    tags-ignore:
+      - '*'
+
+jobs:
+  build:
+    concurrency:
+      group: '${{ github.workflow }}-${{ github.ref }}'
+      cancel-in-progress: true
+    uses: ./.github/workflows/_build_wheels.yaml

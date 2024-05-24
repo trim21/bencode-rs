@@ -1,0 +1,6 @@
+# testing
+pytest==8.1.1
+pytest-benchmark==4.0.0
+# build
+maturin>=1,<2
+bencode-py==4.0.0

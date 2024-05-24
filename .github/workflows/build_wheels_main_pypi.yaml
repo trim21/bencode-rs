@@ -1,0 +1,26 @@
+name: Build Wheels for PyPI
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build:
+    uses: ./.github/workflows/_build_wheels.yaml
+
+  upload_all:
+    name: Upload wheels to PyPI
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4.1.5
+        with:
+          name: wheel
+          path: dist
+
+      - uses: pypa/gh-action-pypi-publish@v1.8.14
+        with:
+          #! Update with your project's PyPI API Token Name!
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}

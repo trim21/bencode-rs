@@ -1,0 +1,78 @@
+name: Tests
+
+on:
+  pull_request:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags-ignore:
+      - "*"
+
+permissions:
+  # deployments permission to deploy GitHub pages website
+  deployments: write
+  # contents permission to update benchmark contents in gh-pages branch
+  contents: write
+
+jobs:
+  test:
+    strategy:
+      max-parallel: 5
+      matrix:
+        os: ["ubuntu-latest", "macos-latest", "windows-latest"]
+        python-version:
+          - "3.8"
+          - "3.9"
+          - "3.10"
+          - "3.11"
+          - "3.12"
+
+    runs-on: "${{ matrix.os }}"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip" # caching pip dependencies
+
+      - run: pip install -r requirements.txt
+
+      - run: pip install -e . -v
+
+      - name: Run pytest
+        run: python -m pytest
+
+  bench:
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip" # caching pip dependencies
+
+      - run: pip install -r requirements.txt
+
+      - run: pip install -e . -v
+
+      - name: Run pytest
+        run: python -m pytest bench.py --benchmark-json=bench.json
+
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: Python Benchmark with pytest-benchmark
+          tool: "pytest"
+          output-file-path: bench.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          alert-threshold: "200%"
+          comment-on-alert: true
+          fail-on-alert: true
+          summary-always: true
