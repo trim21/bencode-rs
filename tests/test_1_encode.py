@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from bencode2 import BencodeEncodeError, bencode
+from bencode_rs import BencodeEncodeError, bencode
 
 
 def test_exception_when_strict():

@@ -5,7 +5,7 @@ build-backend = "maturin"
 [project]
 name = "bencode-rs"
 version = "0.0.1"
-requires-python = ">=3.8"
+requires-python = ">=3.8,<4.0"
 description = "a bencode parser binding build with pyo3"
 readme = "readme.md"
 classifiers = [
@@ -27,7 +27,7 @@ dev = [
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
-module-name = "bencode2._bencode"
+module-name = "bencode_rs._bencode"
 
 [tool.cibuildwheel]
 skip = ["pp*", "*-musllinux_i686"]

@@ -5,17 +5,19 @@ use pyo3::prelude::*;
 use pyo3::{create_exception, PyResult, Python};
 use pyo3::types::PyDict;
 
+create_exception!(bencode_rs,BencodeDecodeError, pyo3::exceptions::PyException);
 
-create_exception!(bencode2, DecodeError, pyo3::exceptions::PyException);
+type DecodeError = BencodeDecodeError;
 
 #[pyfunction]
-pub fn decode(py: Python<'_>, value: Vec<u8>) -> PyResult<Bound<'_, PyAny>> {
-    if value.len() == 0 {
+#[pyo3(text_signature = "(b: bytes, /)")]
+pub fn bdecode(py: Python<'_>, b: Vec<u8>) -> PyResult<Bound<'_, PyAny>> {
+    if b.len() == 0 {
         return Err(DecodeError::new_err("empty byte sequence"));
     }
 
     let mut ctx = Decoder {
-        bytes: value,
+        bytes: b,
         index: 0,
         py,
         depth: 0,
@@ -24,7 +26,9 @@ pub fn decode(py: Python<'_>, value: Vec<u8>) -> PyResult<Bound<'_, PyAny>> {
     return Ok(ctx.decode_any()?.into_bound(py));
 }
 
-pub type DecodeResult = Result<PyObject, PyErr>;
+
+pub type Object = PyObject;
+pub type DecodeResult = Result<Object, PyErr>;
 
 struct Decoder<'a> {
     // str_key: bool,
@@ -206,34 +210,36 @@ impl<'a> Decoder<'a> {
         self.check_depth()?;
         self.index += 1;
 
-        let mut map: HashMap<Vec<u8>, PyObject> = HashMap::with_capacity(8);
-
-        let mut last_key: Option<Vec<u8>> = None;
-
+        let mut map: HashMap<Cow<[u8]>, Object> = HashMap::with_capacity(8);
+        let mut last_key: Option<Cow<[u8]>> = None;
         loop {
             match self.bytes.get(self.index) {
+                // unexpected data end
                 None => return Err(DecodeError::new_err("bytes end when decoding dict")),
+                // loop end
                 Some(b'e') => break,
                 Some(_) => {
                     let key = self.decode_bytes()?;
                     let value = self.decode_any()?;
+                    let ck = Cow::from(key.clone());
                     if !last_key.is_none() {
-                        if last_key.clone().unwrap() > key {
+                        let lk = last_key.unwrap();
+                        if lk > ck {
                             return Err(DecodeError::new_err(format!("dict key not sorted. index {}", self.index)));
-                        } else if last_key.clone().unwrap() == key {
+                        } else if lk == ck {
                             return Err(DecodeError::new_err(format!("duplicated dict key found: index {}", self.index)));
                         }
                     }
-                    map.insert(key.clone(), value.clone());
-                    last_key = Some(key.clone());
+                    map.insert(ck.clone(), value.clone());
+                    last_key = Some(ck.clone());
                 }
             }
         }
 
         let d = PyDict::new_bound(self.py);
 
-        for (k, v) in map.iter() {
-            d.set_item(Cow::from(k).into_py(self.py), v)?;
+        for (k, v) in map.iter_mut() {
+            d.set_item(k.to_owned().into_py(self.py), v.to_owned())?;
         }
 
         self.depth -= 1;

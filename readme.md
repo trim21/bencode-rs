@@ -3,7 +3,7 @@
 ## install
 
 ```shell
-pip install bencode2
+pip install bencode_rs
 ```
 
 ## basic usage
