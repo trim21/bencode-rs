@@ -27,3 +27,6 @@ dev = [
 [tool.maturin]
 features = ["pyo3/extension-module"]
 module-name = "bencode2._bencode"
+
+[tool.cibuildwheel]
+skip = ["pp*", "*-musllinux_i686"]
