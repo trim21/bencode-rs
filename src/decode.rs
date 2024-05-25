@@ -2,8 +2,15 @@ use pyo3::ffi::PyLong_FromString;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
 use pyo3::{create_exception, PyResult, Python};
+use std::ops::{Add, Sub};
 
 create_exception!(bencode2, DecodeError, pyo3::exceptions::PyException);
+
+
+trait Int: Add<Output=Self> + Sub<Output=Self> + PartialEq + Copy {
+    fn zero() -> Self;
+    fn one() -> Self;
+}
 
 #[pyfunction]
 pub fn decode(py: Python<'_>, value: Vec<u8>) -> PyResult<Bound<'_, PyAny>> {
@@ -46,6 +53,9 @@ impl<'a> Decoder<'a> {
             None => return Err(DecodeError::new_err("invalid int")),
         };
 
+        println!("buf: {:?}", String::from_utf8(self.bytes.clone()));
+        println!("index_e: {}", index_e);
+
         if index_e == self.index + 1 {
             return Err(DecodeError::new_err(format!(
                 "invalid int, found 'ie' at index: {}",
@@ -60,6 +70,8 @@ impl<'a> Decoder<'a> {
         //  ^ index
         self.index += 1;
 
+        let mut num_start = self.index;
+
         match self.bytes[self.index] {
             b'-' => {
                 if self.bytes[self.index + 1] == b'0' {
@@ -68,6 +80,7 @@ impl<'a> Decoder<'a> {
                         self.index
                     )));
                 }
+                num_start += 1;
                 sign = -1;
             }
             b'0' => {
@@ -81,22 +94,20 @@ impl<'a> Decoder<'a> {
             _ => {}
         }
 
-        for c_char in self.bytes[self.index..index_e].iter() {
-            let c = c_char - b'0';
-            if c > 9 {
-                return Err(DecodeError::new_err(format!(
-                    "invalid int, '{}' found at {}",
-                    c_char, self.index
-                )));
+        for c in self.bytes[num_start..index_e].iter() {
+            if !(b'0' <= *c && *c <= b'9') {
+                return Err(DecodeError::new_err(
+                    format!("invalid int, '{}' found at {}", *c as char, self.index)
+                ));
             }
         }
 
-        if sign < 0 {
-            let mut val: i128 = 0;
+        if sign > 0 {
+            let mut val: u128 = 0;
 
-            for c_char in self.bytes[self.index..index_e].iter() {
-                let c = c_char - b'0';
-                val = match val.checked_mul(10).and_then(|v| v.checked_add(c as i128)) {
+            for c_char in self.bytes[num_start..index_e].iter() {
+                let c = *c_char - b'0';
+                val = match val.checked_mul(10).and_then(|v| v.checked_add(c as u128)) {
                     Some(v) => v,
                     None => {
                         return self.decode_int_slow(index_e);
@@ -104,31 +115,11 @@ impl<'a> Decoder<'a> {
                 }
             }
 
-            val = match val.checked_mul(-1) {
-                Some(v) => v,
-                None => {
-                    return self.decode_int_slow(index_e);
-                }
-            };
-
             self.index = index_e + 1;
             return Ok(val.into_py(self.py));
         }
 
-        let mut val: u128 = 0;
-
-        for c_char in self.bytes[self.index..index_e].iter() {
-            let c = c_char - b'0';
-            val = match val.checked_mul(10).and_then(|v| v.checked_add(c as u128)) {
-                Some(v) => v,
-                None => {
-                    return self.decode_int_slow(index_e);
-                }
-            }
-        }
-
-        self.index = index_e + 1;
-        return Ok(val.into_py(self.py));
+        return self.decode_int_slow(index_e);
     }
 
     fn decode_int_slow(&mut self, index_e: usize) -> DecodeResult {
@@ -152,9 +143,9 @@ impl<'a> Decoder<'a> {
                 return Err(DecodeError::new_err(format!(
                     "invalid bytes, missing length separator: index {}",
                     self.index
-                )))
+                )));
             }
-        };
+        } + self.index;
 
         if self.bytes[self.index] == b'0' && self.index + 1 != index_sep {
             return Err(DecodeError::new_err(format!(
@@ -168,7 +159,7 @@ impl<'a> Decoder<'a> {
             len = len * 10 + (c - b'0') as usize;
         }
 
-        if self.index + len >= self.bytes.len() {
+        if index_sep + len >= self.bytes.len() {
             return Err(DecodeError::new_err(format!(
                 "invalid bytes length, index out of range: index {}, len {}",
                 self.index, len
@@ -183,12 +174,13 @@ impl<'a> Decoder<'a> {
     }
 
     fn decode_list(&mut self) -> DecodeResult {
+        self.index += 1;
         let mut l = Vec::with_capacity(8);
 
         loop {
             match self.bytes.get(self.index) {
                 None => {
-                    return Err(DecodeError::new_err("invalid list, overflow".to_string()));
+                    return Err(DecodeError::new_err("unexpected end when parsing list".to_string()));
                 }
                 Some(b'e') => break,
                 Some(_) => {
@@ -197,15 +189,17 @@ impl<'a> Decoder<'a> {
             }
         }
 
+        self.index += 1;
         return Ok(l.into_py(self.py));
     }
 
     fn decode_dict(&mut self) -> DecodeResult {
+        self.index += 1;
         let d = PyDict::new_bound(self.py);
 
         loop {
             match self.bytes.get(self.index) {
-                None => return Err(DecodeError::new_err("invalid dict")),
+                None => return Err(DecodeError::new_err("bytes end when decoding dict")),
                 Some(b'e') => break,
                 Some(_) => {
                     let key = self.decode_bytes()?;
@@ -224,6 +218,7 @@ impl<'a> Decoder<'a> {
             }
         }
 
+        self.index += 1;
         return Ok(d.into_py(self.py));
     }
 

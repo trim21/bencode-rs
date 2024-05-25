@@ -42,8 +42,8 @@ fn encode_any<'py>(py: Python<'py>, ctx: &mut Context, value: Bound<'py, PyAny>)
             ctx.buf.put(str.as_bytes());
 
             return Ok(());
-        }
-        Err(_) => {}
+        },
+        Err(_) => {},
     }
 
     match value.clone().downcast_into::<PyBytes>() {
@@ -54,8 +54,8 @@ fn encode_any<'py>(py: Python<'py>, ctx: &mut Context, value: Bound<'py, PyAny>)
             ctx.buf.put(bytes.as_bytes());
 
             return Ok(());
-        }
-        Err(_) => {}
+        },
+        Err(_) => {},
     }
 
     match value.clone().downcast_into::<PyBool>() {
@@ -70,8 +70,8 @@ fn encode_any<'py>(py: Python<'py>, ctx: &mut Context, value: Bound<'py, PyAny>)
 
             ctx.buf.put_u8(b'e');
             return Ok(());
-        }
-        Err(_) => {}
+        },
+        Err(_) => {},
     }
 
     match value.clone().downcast_into::<PyInt>() {
@@ -83,8 +83,8 @@ fn encode_any<'py>(py: Python<'py>, ctx: &mut Context, value: Bound<'py, PyAny>)
             ctx.buf.put(buffer.format(v).as_bytes());
             ctx.buf.put_u8(b'e');
             return Ok(());
-        }
-        Err(_) => {}
+        },
+        Err(_) => {},
     }
 
     let ptr = value.clone().into_ptr().cast::<()>() as usize;
