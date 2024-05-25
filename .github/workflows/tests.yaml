@@ -41,4 +41,4 @@ jobs:
       - name: Run pytest
         run: python -m pytest -sv
         env:
-          RUST_BACKTRACE: '1'
+          RUST_BACKTRACE: 'full'
