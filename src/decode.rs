@@ -1,16 +1,12 @@
+use std::borrow::Cow;
+use std::collections::HashMap;
 use pyo3::ffi::PyLong_FromString;
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict};
 use pyo3::{create_exception, PyResult, Python};
-use std::ops::{Add, Sub};
+use pyo3::types::PyDict;
+
 
 create_exception!(bencode2, DecodeError, pyo3::exceptions::PyException);
-
-
-trait Int: Add<Output=Self> + Sub<Output=Self> + PartialEq + Copy {
-    fn zero() -> Self;
-    fn one() -> Self;
-}
 
 #[pyfunction]
 pub fn decode(py: Python<'_>, value: Vec<u8>) -> PyResult<Bound<'_, PyAny>> {
@@ -22,6 +18,7 @@ pub fn decode(py: Python<'_>, value: Vec<u8>) -> PyResult<Bound<'_, PyAny>> {
         bytes: value,
         index: 0,
         py,
+        depth: 0,
     };
 
     return Ok(ctx.decode_any()?.into_bound(py));
@@ -34,13 +31,14 @@ struct Decoder<'a> {
     bytes: Vec<u8>,
     index: usize, // any torrent file larger than 4GiB?
     py: Python<'a>,
+    depth: usize,
 }
 
 impl<'a> Decoder<'a> {
     fn decode_any(&mut self) -> DecodeResult {
         return match self.current_byte()? {
             b'i' => self.decode_int(),
-            b'0'..=b'9' => self.decode_bytes(),
+            b'0'..=b'9' => Ok(Cow::from(self.decode_bytes()?).into_py(self.py)),
             b'l' => self.decode_list(),
             b'd' => self.decode_dict(),
             _ => return Err(DecodeError::new_err("invalid leading byte")),
@@ -51,10 +49,7 @@ impl<'a> Decoder<'a> {
         let index_e = match self.bytes[self.index..].iter().position(|&b| b == b'e') {
             Some(i) => i,
             None => return Err(DecodeError::new_err("invalid int")),
-        };
-
-        println!("buf: {:?}", String::from_utf8(self.bytes.clone()));
-        println!("index_e: {}", index_e);
+        } + self.index;
 
         if index_e == self.index + 1 {
             return Err(DecodeError::new_err(format!(
@@ -76,8 +71,7 @@ impl<'a> Decoder<'a> {
             b'-' => {
                 if self.bytes[self.index + 1] == b'0' {
                     return Err(DecodeError::new_err(format!(
-                        "invalid int, '-0' found at {}",
-                        self.index
+                        "invalid int, '-0' found at {}", self.index
                     )));
                 }
                 num_start += 1;
@@ -136,7 +130,7 @@ impl<'a> Decoder<'a> {
         };
     }
 
-    fn decode_bytes(&self) -> DecodeResult {
+    fn decode_bytes(&mut self) -> Result<Vec<u8>, PyErr> {
         let index_sep = match self.bytes[self.index..].iter().position(|&b| b == b':') {
             Some(i) => i,
             None => {
@@ -168,12 +162,25 @@ impl<'a> Decoder<'a> {
 
         let str_buff = self.bytes[index_sep + 1..index_sep + 1 + len].to_vec();
 
-        let o = PyBytes::new_bound(self.py, &str_buff);
+        self.index = index_sep + len + 1;
 
-        return Ok(o.into());
+        // let o = PyBytes::new_bound(self.py, &str_buff);
+
+        return Ok(str_buff);
+    }
+
+    fn check_depth(&mut self) -> Result<(), PyErr> {
+        if self.depth > 10000 {
+            return Err(DecodeError::new_err("object depth limit 10000 reached"));
+        }
+
+        return Ok(());
     }
 
     fn decode_list(&mut self) -> DecodeResult {
+        self.depth += 1;
+        self.check_depth()?;
+
         self.index += 1;
         let mut l = Vec::with_capacity(8);
 
@@ -189,13 +196,19 @@ impl<'a> Decoder<'a> {
             }
         }
 
+        self.depth -= 1;
         self.index += 1;
         return Ok(l.into_py(self.py));
     }
 
     fn decode_dict(&mut self) -> DecodeResult {
+        self.depth += 1;
+        self.check_depth()?;
         self.index += 1;
-        let d = PyDict::new_bound(self.py);
+
+        let mut map: HashMap<Vec<u8>, PyObject> = HashMap::with_capacity(8);
+
+        let mut last_key: Option<Vec<u8>> = None;
 
         loop {
             match self.bytes.get(self.index) {
@@ -204,20 +217,26 @@ impl<'a> Decoder<'a> {
                 Some(_) => {
                     let key = self.decode_bytes()?;
                     let value = self.decode_any()?;
-                    match d.set_item(key, value) {
-                        Ok(_) => {}
-                        Err(err) => {
-                            return Err(DecodeError::new_err(format!(
-                                "failed to decode dict, err {}. index {}",
-                                err.to_string(),
-                                self.index
-                            )));
+                    if !last_key.is_none() {
+                        if last_key.clone().unwrap() > key {
+                            return Err(DecodeError::new_err(format!("dict key not sorted. index {}", self.index)));
+                        } else if last_key.clone().unwrap() == key {
+                            return Err(DecodeError::new_err(format!("duplicated dict key found: index {}", self.index)));
                         }
                     }
+                    map.insert(key.clone(), value.clone());
+                    last_key = Some(key.clone());
                 }
             }
         }
 
+        let d = PyDict::new_bound(self.py);
+
+        for (k, v) in map.iter() {
+            d.set_item(Cow::from(k).into_py(self.py), v)?;
+        }
+
+        self.depth -= 1;
         self.index += 1;
         return Ok(d.into_py(self.py));
     }
