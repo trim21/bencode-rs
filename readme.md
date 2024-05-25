@@ -1,4 +1,4 @@
-# A bencode serialize/deserialize library based on cython
+# A bencode serialize/deserialize library writte in Rust
 
 ## install
 
@@ -9,10 +9,9 @@ pip install bencode_rs
 ## basic usage
 
 ```python
-import bencode2
+import bencode_rs
 
-assert bencode2.bdecode(b"d4:spaml1:a1:bee") == {b"spam": [b"a", b"b"]}
-assert bencode2.bdecode(b"d4:spaml1:a1:bee", str_key=True) == {"spam": [b"a", b"b"]}
+assert bencode_rs.bdecode(b"d4:spaml1:a1:bee") == {b"spam": [b"a", b"b"]}
 
-assert bencode2.bencode({'hello': 'world'}) == b'd5:hello5:worlde'
+assert bencode_rs.bencode({'hello': 'world'}) == b'd5:hello5:worlde'
 ```
