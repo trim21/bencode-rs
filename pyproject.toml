@@ -4,24 +4,25 @@ build-backend = "maturin"
 
 [project]
 name = "bencode-rs"
+version = "0.0.1"
 requires-python = ">=3.8"
+description = "a bencode parser binding build with pyo3"
+readme = "readme.md"
 classifiers = [
-  "Development Status :: 2 - Pre-Alpha",
-  "License :: OSI Approved :: MIT License",
-  "Programming Language :: Rust",
-  "Programming Language :: Python :: Implementation :: CPython",
-  "Programming Language :: Python :: Implementation :: PyPy",
+    "Development Status :: 2 - Pre-Alpha",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
 ]
-dynamic = ["version"]
 
 [project.optional-dependencies]
-
 dev = [
-  # lint
-  "pre-commit",
-  # testing
-  "pytest",
-  "pytest-github-actions-annotate-failures==0.2.0",
+    # lint
+    "pre-commit",
+    # testing
+    "pytest",
+    "pytest-github-actions-annotate-failures==0.2.0",
 ]
 
 [tool.maturin]
