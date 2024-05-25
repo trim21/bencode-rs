@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 import collections
-import unittest
 from typing import Any
 
 import pytest
