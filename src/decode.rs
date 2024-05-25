@@ -1,194 +1,238 @@
+use pyo3::ffi::PyLong_FromString;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
 use pyo3::{create_exception, PyResult, Python};
 
-create_exception!(bencode2, BencodeDecodeError, pyo3::exceptions::PyException);
+create_exception!(bencode2, DecodeError, pyo3::exceptions::PyException);
 
 #[pyfunction]
-pub fn decode<'py>(py: Python<'py>, value: Vec<u8>) -> PyResult<Bound<'py, PyAny>> {
-    let _ctx = Decoder {
-        // str_key: str_key,
-        py: py,
+pub fn decode(py: Python<'_>, value: Vec<u8>) -> PyResult<Bound<'_, PyAny>> {
+    if value.len() == 0 {
+        return Err(DecodeError::new_err("empty byte sequence"));
+    }
+
+    let mut ctx = Decoder {
+        bytes: value,
+        index: 0,
+        py,
     };
 
-    let result = match _ctx.decode(&mut value.into_iter()) {
-        Ok(result) => result,
-        Err(e) => return Err(BencodeDecodeError::new_err(e.to_string())),
-    };
-
-    return Ok(result.into_bound(py));
+    return Ok(ctx.decode_any()?.into_bound(py));
 }
 
 pub type DecodeResult = Result<PyObject, PyErr>;
 
 struct Decoder<'a> {
     // str_key: bool,
+    bytes: Vec<u8>,
+    index: usize, // any torrent file larger than 4GiB?
     py: Python<'a>,
 }
 
 impl<'a> Decoder<'a> {
-    fn decode<T>(&self, bytes: &mut T) -> DecodeResult
-    where
-        T: Iterator<Item = u8>,
-    {
-        let result = match bytes.next() {
-            None => return Err(BencodeDecodeError::new_err("empty byte sequence")),
-            Some(start_byte) => self.handler(bytes, start_byte),
-        };
-
-        if result.is_err() {
-            return result;
-        }
-
-        return match bytes.next() {
-            None => result,
-            Some(_) => return Err(BencodeDecodeError::new_err("invalid byte sequence")),
+    fn decode_any(&mut self) -> DecodeResult {
+        return match self.current_byte()? {
+            b'i' => self.decode_int(),
+            b'0'..=b'9' => self.decode_bytes(),
+            b'l' => self.decode_list(),
+            b'd' => self.decode_dict(),
+            _ => return Err(DecodeError::new_err("invalid leading byte")),
         };
     }
 
-    fn handler<T>(&self, bytes: &mut T, start_byte: u8) -> DecodeResult
-    where
-        T: Iterator<Item = u8>,
-    {
-        match start_byte {
-            b'0'..=b'9' => self.decode_bytes(bytes, start_byte),
-            b'i' => self.decode_int(bytes, start_byte),
-            b'l' => self.decode_list(bytes, start_byte),
-            b'd' => self.decode_dict(bytes, start_byte),
-            _ => return Err(BencodeDecodeError::new_err("invalid byte")),
-        }
-    }
+    fn decode_int(&mut self) -> DecodeResult {
+        let index_e = match self.bytes[self.index..].iter().position(|&b| b == b'e') {
+            Some(i) => i,
+            None => return Err(DecodeError::new_err("invalid int")),
+        };
 
-    fn decode_int<T>(&self, bytes: &mut T, _start_byte: u8) -> DecodeResult
-    where
-        T: Iterator<Item = u8>,
-    {
-        let mut buff = vec![];
+        if index_e == self.index + 1 {
+            return Err(DecodeError::new_err(format!(
+                "invalid int, found 'ie' at index: {}",
+                self.index
+            )));
+        }
+
         let mut sign = 1;
 
-        let nxt = match bytes.next() {
-            None => return Err(BencodeDecodeError::new_err("invalid int")),
-            Some(ch) => ch,
-        };
+        // i1234e
+        // i-1234e
+        //  ^ index
+        self.index += 1;
 
-        if nxt == b'-' {
-            sign = -1;
-        } else if nxt >= b'0' && nxt <= b'9' {
-            buff.push(nxt);
-        } else {
-            return Err(BencodeDecodeError::new_err("invalid int"));
+        match self.bytes[self.index] {
+            b'-' => {
+                if self.bytes[self.index + 1] == b'0' {
+                    return Err(DecodeError::new_err(format!(
+                        "invalid int, '-0' found at {}",
+                        self.index
+                    )));
+                }
+                sign = -1;
+            }
+            b'0' => {
+                if self.index + 1 != index_e {
+                    return Err(DecodeError::new_err(format!(
+                        "invalid int, non-zero int should not start with '0'. found at {}",
+                        self.index
+                    )));
+                }
+            }
+            _ => {}
         }
 
-        while let Some(ch) = bytes.next() {
-            match ch {
-                b'0'..=b'9' => buff.push(ch),
-                b'e' => break,
-                _ => return Err(BencodeDecodeError::new_err("integer".to_string())),
+        for c_char in self.bytes[self.index..index_e].iter() {
+            let c = c_char - b'0';
+            if c > 9 {
+                return Err(DecodeError::new_err(format!(
+                    "invalid int, '{}' found at {}",
+                    c_char, self.index
+                )));
             }
         }
 
-        if buff.len() > 1 && buff[0] == b'0' {
-            return Err(BencodeDecodeError::new_err("invalid leading zero in int"));
+        if sign < 0 {
+            let mut val: i128 = 0;
+
+            for c_char in self.bytes[self.index..index_e].iter() {
+                let c = c_char - b'0';
+                val = match val.checked_mul(10).and_then(|v| v.checked_add(c as i128)) {
+                    Some(v) => v,
+                    None => {
+                        return self.decode_int_slow(index_e);
+                    }
+                }
+            }
+
+            val = match val.checked_mul(-1) {
+                Some(v) => v,
+                None => {
+                    return self.decode_int_slow(index_e);
+                }
+            };
+
+            self.index = index_e + 1;
+            return Ok(val.into_py(self.py));
         }
 
-        let i = bytes_to_int(buff)?;
+        let mut val: u128 = 0;
 
-        if sign == -1 && i == 0 {
-            return Err(BencodeDecodeError::new_err("-0 as int found"));
+        for c_char in self.bytes[self.index..index_e].iter() {
+            let c = c_char - b'0';
+            val = match val.checked_mul(10).and_then(|v| v.checked_add(c as u128)) {
+                Some(v) => v,
+                None => {
+                    return self.decode_int_slow(index_e);
+                }
+            }
         }
 
-        return Ok((i * sign).into_py(self.py));
+        self.index = index_e + 1;
+        return Ok(val.into_py(self.py));
     }
 
-    fn decode_bytes<T>(&self, bytes: &mut T, start_byte: u8) -> DecodeResult
-    where
-        T: Iterator<Item = u8>,
-    {
-        let mut len_buff = vec![start_byte];
-        let mut str_buff = vec![];
+    fn decode_int_slow(&mut self, index_e: usize) -> DecodeResult {
+        let s = self.bytes[self.index..index_e].to_vec();
 
-        while let Some(ch) = bytes.next() {
-            match ch {
-                b'0'..=b'9' => len_buff.push(ch),
-                b':' => break,
-                _ => return Err(BencodeDecodeError::new_err("byte string".to_string())),
+        self.index = index_e + 1;
+
+        let c_str = std::ffi::CString::new(s).unwrap();
+        unsafe {
+            let ptr = PyLong_FromString(c_str.as_ptr(), std::ptr::null_mut(), 10);
+
+            // panic!("not implemented");
+            return Py::from_owned_ptr_or_err(self.py, ptr);
+        };
+    }
+
+    fn decode_bytes(&self) -> DecodeResult {
+        let index_sep = match self.bytes[self.index..].iter().position(|&b| b == b':') {
+            Some(i) => i,
+            None => {
+                return Err(DecodeError::new_err(format!(
+                    "invalid bytes, missing length separator: index {}",
+                    self.index
+                )))
             }
+        };
+
+        if self.bytes[self.index] == b'0' && self.index + 1 != index_sep {
+            return Err(DecodeError::new_err(format!(
+                "invalid bytes length, leading '0' found at index {}",
+                self.index
+            )));
         }
 
-        let len = bytes_to_int(len_buff)?;
-
-        for _ in 0..len {
-            match bytes.next() {
-                None => return Err(BencodeDecodeError::new_err("invalid bytes length")),
-                Some(ch) => str_buff.push(ch),
-            }
+        let mut len: usize = 0;
+        for c in self.bytes[self.index..index_sep].iter() {
+            len = len * 10 + (c - b'0') as usize;
         }
+
+        if self.index + len >= self.bytes.len() {
+            return Err(DecodeError::new_err(format!(
+                "invalid bytes length, index out of range: index {}, len {}",
+                self.index, len
+            )));
+        }
+
+        let str_buff = self.bytes[index_sep + 1..index_sep + 1 + len].to_vec();
 
         let o = PyBytes::new_bound(self.py, &str_buff);
 
         return Ok(o.into());
     }
 
-    fn decode_list<T>(&self, bytes: &mut T, _start_byte: u8) -> DecodeResult
-    where
-        T: Iterator<Item = u8>,
-    {
-        let mut l = vec![];
+    fn decode_list(&mut self) -> DecodeResult {
+        let mut l = Vec::with_capacity(8);
 
         loop {
-            match bytes.next() {
-                None => return Err(BencodeDecodeError::new_err("invalid list")),
-                Some(ch) => match ch {
-                    b'e' => break,
-                    ch => {
-                        let item = self.handler(bytes, ch)?;
-                        l.push(item);
-                    }
-                },
+            match self.bytes.get(self.index) {
+                None => {
+                    return Err(DecodeError::new_err("invalid list, overflow".to_string()));
+                }
+                Some(b'e') => break,
+                Some(_) => {
+                    l.push(self.decode_any()?);
+                }
             }
         }
 
         return Ok(l.into_py(self.py));
     }
 
-    fn decode_dict<T>(&self, bytes: &mut T, _start_byte: u8) -> DecodeResult
-    where
-        T: Iterator<Item = u8>,
-    {
+    fn decode_dict(&mut self) -> DecodeResult {
         let d = PyDict::new_bound(self.py);
 
         loop {
-            match bytes.next() {
-                None => return Err(BencodeDecodeError::new_err("invalid dict")),
-                Some(ch) => match ch {
-                    b'e' => break,
-                    _ => {
-                        let key = self.decode_bytes(bytes, ch)?;
-                        let value = self.handler(bytes, ch)?;
-                        match d.set_item(key, value) {
-                            Ok(_) => {}
-                            Err(err) => {
-                                return Err(BencodeDecodeError::new_err(err.to_string()));
-                            }
-                        };
+            match self.bytes.get(self.index) {
+                None => return Err(DecodeError::new_err("invalid dict")),
+                Some(b'e') => break,
+                Some(_) => {
+                    let key = self.decode_bytes()?;
+                    let value = self.decode_any()?;
+                    match d.set_item(key, value) {
+                        Ok(_) => {}
+                        Err(err) => {
+                            return Err(DecodeError::new_err(format!(
+                                "failed to decode dict, err {}. index {}",
+                                err.to_string(),
+                                self.index
+                            )));
+                        }
                     }
-                },
+                }
             }
         }
 
         return Ok(d.into_py(self.py));
     }
-}
 
-fn bytes_to_str(bytes: Vec<u8>) -> String {
-    return bytes.iter().map(|&b| b as char).collect::<String>();
-}
-
-fn bytes_to_int(bytes: Vec<u8>) -> Result<i128, PyErr> {
-    let integer_str = bytes_to_str(bytes);
-
-    return match integer_str.parse::<i128>() {
-        Err(_) => return Err(BencodeDecodeError::new_err("invalid int")),
-        Ok(i) => Ok(i),
-    };
+    fn current_byte(&self) -> Result<u8, PyErr> {
+        return match self.bytes.get(self.index) {
+            None => {
+                return Err(DecodeError::new_err("index out of range"));
+            }
+            Some(ch) => Ok(*ch),
+        };
+    }
 }

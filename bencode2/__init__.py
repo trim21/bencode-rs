@@ -3,12 +3,12 @@ from typing import Any
 from ._bencode import encode, BencodeEncodeError, decode, BencodeDecodeError
 
 
-def bencode(obj: Any) -> bytes:
+def bencode(obj: Any, /) -> bytes:
     return encode(obj)
 
 
-def bdecode(obj: bytes, *, str_key: bool = False) -> Any:
-    return decode(obj, str_key=str_key)
+def bdecode(obj: bytes, /) -> Any:
+    return decode(obj)
 
 
 __all__ = [

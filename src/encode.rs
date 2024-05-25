@@ -1,10 +1,12 @@
 use std::borrow::Cow;
+use std::collections::HashSet;
 
 use bytes::{BufMut, Bytes, BytesMut};
+use pyo3::exceptions::PyValueError;
 use pyo3::{
     create_exception,
-    exceptions::{PyException, PyTypeError},
-    ffi::{self, Py_TYPE},
+    exceptions::PyTypeError,
+    ffi::Py_TYPE,
     prelude::*,
     types::{PyBool, PyBytes, PyDict, PyInt, PyList, PyString, PyTuple, PyType},
     PyTypeCheck,
@@ -13,158 +15,118 @@ use smallvec::SmallVec;
 
 create_exception!(bencode2, BencodeEncodeError, pyo3::exceptions::PyException);
 
-// pub fn encode(value: PyObject, py: Python<'_>) -> PyResult<Cow<'_, [u8]>> {
-#[pyfunction]
-pub fn encode<'py>(py: Python<'py>, value: Bound<'py, PyAny>) -> PyResult<Cow<'py, [u8]>> {
-    let mut buf: BytesMut = BytesMut::with_capacity(4096);
-
-    _encode(py, &mut buf, value)?;
-
-    return Ok(buf.to_vec().into());
+struct Context {
+    buf: BytesMut,
+    seen: HashSet<usize>,
 }
 
-pub fn _encode<'py>(py: Python<'py>, buf: &mut BytesMut, value: Bound<'py, PyAny>) -> PyResult<()> {
-    if PyString::type_check(&value) {
-        return _encode_str(value.extract()?, buf);
-    }
+#[pyfunction]
+pub fn encode<'py>(py: Python<'py>, value: Bound<'py, PyAny>) -> PyResult<Cow<'py, [u8]>> {
+    let mut ctx = Context {
+        buf: BytesMut::with_capacity(4096),
+        seen: HashSet::with_capacity(100),
+    };
 
-    if PyBytes::type_check(&value) {
-        let v: Cow<[u8]> = value.extract()?;
-        // buf.put(&b"[bytes]"[..]);
-        return _encode_bytes(v, buf);
-    }
+    encode_any(py, &mut ctx, value)?;
 
-    if PyBool::type_check(&value) {
-        buf.put_u8(b'i');
+    return Ok(ctx.buf.to_vec().into());
+}
 
-        unsafe {
-            if value.as_ptr() == ffi::Py_True() {
-                buf.put_u8(b'1');
-            } else {
-                buf.put_u8(b'0');
-            }
+fn encode_any<'py>(py: Python<'py>, ctx: &mut Context, value: Bound<'py, PyAny>) -> PyResult<()> {
+    match value.clone().downcast_into::<PyString>() {
+        Ok(s) => {
+            let str = s.to_string();
+            let mut buffer = itoa::Buffer::new();
+            ctx.buf.put(buffer.format(str.len()).as_bytes());
+            ctx.buf.put_u8(b':');
+            ctx.buf.put(str.as_bytes());
+
+            return Ok(());
         }
-
-        // TODO: us `v is True` instead of `bool(v)`
-        // if value.is_truthy()? {
-        //     buf.put_u8(b'1');
-        // } else {
-        //     buf.put_u8(b'0');
-        // }
-
-        buf.put_u8(b'e');
-        return Ok(());
+        Err(_) => {}
     }
 
-    if PyInt::type_check(&value) {
-        let v: i128 = value.extract()?;
-        let mut buffer = itoa::Buffer::new();
+    match value.clone().downcast_into::<PyBytes>() {
+        Ok(bytes) => {
+            let mut buffer = itoa::Buffer::new();
+            ctx.buf.put(buffer.format(bytes.len()?).as_bytes());
+            ctx.buf.put_u8(b':');
+            ctx.buf.put(bytes.as_bytes());
 
-        buf.put_u8(b'i');
-        buf.put(buffer.format(v).as_bytes());
-        buf.put_u8(b'e');
-        return Ok(());
+            return Ok(());
+        }
+        Err(_) => {}
     }
+
+    match value.clone().downcast_into::<PyBool>() {
+        Ok(bool) => {
+            ctx.buf.put_u8(b'i');
+
+            if bool.is_true() {
+                ctx.buf.put_u8(b'1');
+            } else {
+                ctx.buf.put_u8(b'0');
+            }
+
+            ctx.buf.put_u8(b'e');
+            return Ok(());
+        }
+        Err(_) => {}
+    }
+
+    match value.clone().downcast_into::<PyInt>() {
+        Ok(_) => {
+            let v: i128 = value.extract()?;
+            let mut buffer = itoa::Buffer::new();
+
+            ctx.buf.put_u8(b'i');
+            ctx.buf.put(buffer.format(v).as_bytes());
+            ctx.buf.put_u8(b'e');
+            return Ok(());
+        }
+        Err(_) => {}
+    }
+
+    let ptr = value.clone().into_ptr().cast::<()>() as usize;
+    let repr = value.repr().unwrap().to_string();
 
     if PyList::type_check(&value) || PyTuple::type_check(&value) {
+        if ctx.seen.contains(&ptr) {
+            return Err(PyValueError::new_err(format!(
+                "circular reference found: {repr}"
+            )));
+        }
+        ctx.seen.insert(ptr);
         let v: Vec<Bound<'py, PyAny>> = value.extract()?;
 
-        buf.put_u8(b'l');
+        ctx.buf.put_u8(b'l');
         for x in v {
-            _encode(py, buf, x)?;
+            encode_any(py, ctx, x)?;
         }
-        buf.put_u8(b'e');
+        ctx.buf.put_u8(b'e');
+
+        ctx.seen.remove(&ptr);
+
         return Ok(());
     }
 
     if PyDict::type_check(&value) {
-        if let Ok(d) = value.extract::<Bound<'py, PyDict>>() {
-            return _encode_dict(py, buf, d);
-        } else {
-            return Err(PyException::new_err(
-                "unexpected error, failed to extract dict".to_string(),
-            ));
+        if ctx.seen.contains(&ptr) {
+            return Err(PyValueError::new_err(format!(
+                "circular reference found: {repr}"
+            )));
         }
+        ctx.seen.insert(ptr);
+
+        _encode_dict(py, ctx, value.downcast_into()?)?;
+        ctx.seen.remove(&ptr);
+        return Ok(());
     }
 
-    // unsafe {
-    //     if PyLong_Check(o) == 1 {
-    //         let mut res: i32 = 0;
-    //         let v = PyLong_AsLongLongAndOverflow(o, &res);
-    //         if res == 0 {
-    //             return _encode_int(v, buf);
-    //         }
+    let typ = value.get_type();
+    let name = typ.name()?;
 
-    //         let err = PyErr_Occurred();
-    //         if res == -1 && err != std::ptr::null_mut() {
-    //             return Err(PyException::new_err(
-    //                 "Failed to convert long to object".to_string(),
-    //             ));
-    //         }
-
-    //         PyErr_Clear();
-    //         let o = PyString::new_bound(py, "%d");
-
-    //         return _encode_int_slow(buf, value);
-    //     }
-
-    //     if PyBool_Check(o) == 1 {
-    //         buf.put(&b"bool"[..]);
-    //         buf.put(&b"i"[..]);
-
-    //         if value.is_truthy(py)? {
-    //             buf.put(&b"1"[..]);
-    //         } else {
-    //             buf.put(&b"0"[..]);
-    //         }
-
-    //         buf.put(&b"e"[..]);
-    //         return Ok(());
-    //     }
-
-    //     if (PyTuple_Check(o) == 1) {
-    //         let v: Vec<PyObject> = value.extract(py)?;
-    //         buf.put(&b"l"[..]);
-    //         for x in v {
-    //             _encode(x, py, buf)?;
-    //         }
-    //         buf.put(&b"e"[..]);
-    //         return Ok(());
-    //     }
-
-    //     if (PyList_Check(o) == 1) || (PyTuple_Check(o) == 1) {
-    //         let v: Vec<PyObject> = value.extract(py)?;
-    //         buf.put(&b"l"[..]);
-    //         for x in v {
-    //             _encode(x, py, buf)?;
-    //         }
-    //         buf.put(&b"e"[..]);
-    //         return Ok(());
-    //     }
-
-    //     if PyUnicode_Check(o) == 1 {
-    //         return _encode_str(value.extract(py)?, buf);
-    //     }
-
-    //     if PyBytes_Check(o) == 1 {
-    //         let v: Cow<[u8]> = value.extract(py)?;
-    //         // buf.put(&b"[bytes]"[..]);
-    //         return _encode_bytes(v, buf);
-    //     }
-    // }
-
-    // PyType::new_bound(py, &value)).qualname()?;
-
-    // return Err(BencodeEncodeError::new_err("Unsupported type".to_string()));
-
-    unsafe {
-        let typ = Py_TYPE(value.as_ptr());
-
-        let bb = PyType::from_borrowed_type_ptr(py, typ);
-        let name = bb.name()?;
-
-        return Err(PyTypeError::new_err(format!("Unsupported type '{name}'")));
-    }
+    return Err(PyTypeError::new_err(format!("Unsupported type '{name}'")));
 }
 
 fn _encode_bytes(v: Cow<[u8]>, buf: &mut BytesMut) -> PyResult<()> {
@@ -188,8 +150,8 @@ fn _encode_str<'py>(v: String, buf: &mut BytesMut) -> PyResult<()> {
     return Ok(());
 }
 
-fn _encode_dict<'py>(py: Python<'py>, buf: &mut BytesMut, v: Bound<'py, PyDict>) -> PyResult<()> {
-    buf.put(&b"d"[..]);
+fn _encode_dict<'py>(py: Python<'py>, ctx: &mut Context, v: Bound<'py, PyDict>) -> PyResult<()> {
+    ctx.buf.put(&b"d"[..]);
 
     let mut sv: SmallVec<[(String, Bound<'_, PyAny>); 8]> = SmallVec::with_capacity(v.len());
 
@@ -231,11 +193,11 @@ fn _encode_dict<'py>(py: Python<'py>, buf: &mut BytesMut, v: Bound<'py, PyDict>)
     }
 
     for (key, value) in sv {
-        _encode_str(key, buf)?;
-        _encode(py, buf, value.into_any())?;
+        _encode_str(key, &mut ctx.buf)?;
+        encode_any(py, ctx, value.into_any())?;
     }
 
-    buf.put(&b"e"[..]);
+    ctx.buf.put(&b"e"[..]);
 
     return Ok(());
 }
