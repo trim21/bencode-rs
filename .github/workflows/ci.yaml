@@ -68,7 +68,7 @@ jobs:
           python-version: "3.x"
           cache: "pip" # caching pip dependencies
 
-      - run: pip install abi3audit
+      - run: pip install -r requirements.txt
 
       - uses: actions/download-artifact@v4
         with:
