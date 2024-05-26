@@ -20,15 +20,6 @@ keywords = [
     "p2p",
 ]
 
-[project.optional-dependencies]
-dev = [
-    # lint
-    "pre-commit",
-    # testing
-    "pytest",
-    "pytest-github-actions-annotate-failures==0.2.0",
-]
-
 [tool.maturin]
 features = ["pyo3/extension-module"]
 module-name = "bencode_rs._bencode"

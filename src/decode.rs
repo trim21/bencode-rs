@@ -1,23 +1,23 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
-use pyo3::ffi::PyLong_FromString;
+use pyo3::ffi::{Py_BuildValue, PyExc_OverflowError, PyLong_FromString};
 use pyo3::prelude::*;
 use pyo3::{create_exception, PyResult, Python};
-use pyo3::types::PyDict;
+use pyo3::exceptions::PyOverflowError;
+use pyo3::types::{PyBytes, PyDict, PyLong};
 
 create_exception!(bencode_rs,BencodeDecodeError, pyo3::exceptions::PyException);
 
 type DecodeError = BencodeDecodeError;
 
 #[pyfunction]
-#[pyo3(text_signature = "(b: bytes, /)")]
-pub fn bdecode(py: Python<'_>, b: Vec<u8>) -> PyResult<Bound<'_, PyAny>> {
-    if b.len() == 0 {
+pub fn bdecode<'py>(py: Python<'py>, b: Bound<'py, PyBytes>) -> PyResult<Bound<'py, PyAny>> {
+    if b.len().unwrap() == 0 {
         return Err(DecodeError::new_err("empty byte sequence"));
     }
 
     let mut ctx = Decoder {
-        bytes: b,
+        bytes: b.as_bytes().to_vec(),
         index: 0,
         py,
         depth: 0,
@@ -39,7 +39,7 @@ struct Decoder<'a> {
 }
 
 impl<'a> Decoder<'a> {
-    fn decode_any(&mut self) -> DecodeResult {
+    fn decode_any(&mut self) -> Result<PyObject, PyErr> {
         return match self.current_byte()? {
             b'i' => self.decode_int(),
             b'0'..=b'9' => Ok(Cow::from(self.decode_bytes()?).into_py(self.py)),
@@ -49,7 +49,7 @@ impl<'a> Decoder<'a> {
         };
     }
 
-    fn decode_int(&mut self) -> DecodeResult {
+    fn decode_int(&mut self) -> Result<PyObject, PyErr> {
         let index_e = match self.bytes[self.index..].iter().position(|&b| b == b'e') {
             Some(i) => i,
             None => return Err(DecodeError::new_err("invalid int")),
@@ -100,39 +100,41 @@ impl<'a> Decoder<'a> {
             }
         }
 
-        if sign > 0 {
-            let mut val: u128 = 0;
+        // if sign > 0 {
+        let mut val: i128 = 0;
 
-            for c_char in self.bytes[num_start..index_e].iter() {
-                let c = *c_char - b'0';
-                val = match val.checked_mul(10).and_then(|v| v.checked_add(c as u128)) {
-                    Some(v) => v,
-                    None => {
-                        return self.decode_int_slow(index_e);
-                    }
+        for c_char in self.bytes[num_start..index_e].iter() {
+            let c = *c_char - b'0';
+            val = match val.checked_mul(10).and_then(|v| v.checked_add(c as i128)) {
+                Some(v) => v,
+                None => {
+                    return Err(PyOverflowError::new_err(format!("int too large at index {}", self.index)));
                 }
             }
-
-            self.index = index_e + 1;
-            return Ok(val.into_py(self.py));
         }
 
-        return self.decode_int_slow(index_e);
-    }
-
-    fn decode_int_slow(&mut self, index_e: usize) -> DecodeResult {
-        let s = self.bytes[self.index..index_e].to_vec();
+        val = val * sign;
 
         self.index = index_e + 1;
+        return Ok(val.into_py(self.py).into());
+        // }
 
-        let c_str = std::ffi::CString::new(s).unwrap();
-        unsafe {
-            let ptr = PyLong_FromString(c_str.as_ptr(), std::ptr::null_mut(), 10);
-
-            // panic!("not implemented");
-            return Py::from_owned_ptr_or_err(self.py, ptr);
-        };
+        // return self.decode_int_slow(index_e);
     }
+
+    // fn decode_int_slow(&mut self, index_e: usize) -> Result<PyLong, PyErr> {
+    //     let s = self.bytes[self.index..index_e].to_vec();
+    //
+    //     self.index = index_e + 1;
+    //
+    //     let c_str = std::ffi::CString::new(s).unwrap();
+    //     unsafe {
+    //         let ptr = PyLong_FromString(c_str.as_ptr(), std::ptr::null_mut(), 10);
+    //
+    //         // panic!("not implemented");
+    //         return Py::from_owned_ptr_or_err(self.py, ptr);
+    //     };
+    // }
 
     fn decode_bytes(&mut self) -> Result<Vec<u8>, PyErr> {
         let index_sep = match self.bytes[self.index..].iter().position(|&b| b == b':') {
@@ -173,17 +175,17 @@ impl<'a> Decoder<'a> {
         return Ok(str_buff);
     }
 
-    fn check_depth(&mut self) -> Result<(), PyErr> {
-        if self.depth > 10000 {
-            return Err(DecodeError::new_err("object depth limit 10000 reached"));
-        }
-
-        return Ok(());
-    }
+    // fn check_depth(&mut self) -> Result<(), PyErr> {
+    //     if self.depth > 10000 {
+    //         return Err(DecodeError::new_err("object depth limit 10000 reached"));
+    //     }
+    //
+    //     return Ok(());
+    // }
 
     fn decode_list(&mut self) -> DecodeResult {
-        self.depth += 1;
-        self.check_depth()?;
+        // self.depth += 1;
+        // self.check_depth()?;
 
         self.index += 1;
         let mut l = Vec::with_capacity(8);
@@ -200,18 +202,18 @@ impl<'a> Decoder<'a> {
             }
         }
 
-        self.depth -= 1;
+        // self.depth -= 1;
         self.index += 1;
         return Ok(l.into_py(self.py));
     }
 
     fn decode_dict(&mut self) -> DecodeResult {
-        self.depth += 1;
-        self.check_depth()?;
+        // self.depth += 1;
+        // self.check_depth()?;
         self.index += 1;
 
         let mut map: HashMap<Cow<[u8]>, Object> = HashMap::with_capacity(8);
-        let mut last_key: Option<Cow<[u8]>> = None;
+        // let mut last_key: Option<Cow<[u8]>> = None;
         loop {
             match self.bytes.get(self.index) {
                 // unexpected data end
@@ -221,17 +223,17 @@ impl<'a> Decoder<'a> {
                 Some(_) => {
                     let key = self.decode_bytes()?;
                     let value = self.decode_any()?;
-                    let ck = Cow::from(key.clone());
-                    if !last_key.is_none() {
-                        let lk = last_key.unwrap();
-                        if lk > ck {
-                            return Err(DecodeError::new_err(format!("dict key not sorted. index {}", self.index)));
-                        } else if lk == ck {
-                            return Err(DecodeError::new_err(format!("duplicated dict key found: index {}", self.index)));
-                        }
-                    }
-                    map.insert(ck.clone(), value.clone());
-                    last_key = Some(ck.clone());
+                    // let ck = Cow::from(key.clone());
+                    // if !last_key.is_none() {
+                    //     let lk = last_key.unwrap();
+                    //     if lk > ck {
+                    //         return Err(DecodeError::new_err(format!("dict key not sorted. index {}", self.index)));
+                    //     } else if lk == ck {
+                    //         return Err(DecodeError::new_err(format!("duplicated dict key found: index {}", self.index)));
+                    //     }
+                    // }
+                    map.insert(Cow::from(key), value);
+                    // last_key = Some(ck.clone());
                 }
             }
         }
@@ -242,7 +244,7 @@ impl<'a> Decoder<'a> {
             d.set_item(k.to_owned().into_py(self.py), v.to_owned())?;
         }
 
-        self.depth -= 1;
+        // self.depth -= 1;
         self.index += 1;
         return Ok(d.into_py(self.py));
     }
