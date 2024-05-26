@@ -26,6 +26,3 @@ Homepage = 'https://github.com/trim21/bencode-rs'
 [tool.maturin]
 features = ["pyo3/extension-module"]
 module-name = "bencode_rs._bencode"
-
-[tool.cibuildwheel]
-skip = ["pp*", "*-musllinux_i686"]
