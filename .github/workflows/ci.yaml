@@ -76,3 +76,4 @@ jobs:
           path: dist
 
       - run: abi3audit --verbose dist/*.whl
+      - run: pipx run twine check --strict dist/*

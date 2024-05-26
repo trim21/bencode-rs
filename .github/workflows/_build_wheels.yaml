@@ -116,15 +116,3 @@ jobs:
         with:
           name: wheel
           pattern: wheels-*
-
-  check-dist:
-    name: Check dist
-    needs: [ merge-wheel-artifact ]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: wheel
-          path: dist
-
-      - run: pipx run twine check --strict dist/*
