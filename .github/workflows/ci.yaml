@@ -1,0 +1,79 @@
+name: ci
+
+on:
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+    tags-ignore:
+      - "*"
+
+jobs:
+  build:
+    concurrency:
+      group: "${{ github.workflow }}-${{ github.ref }}"
+      cancel-in-progress: true
+    uses: ./.github/workflows/_build_wheels.yaml
+
+  test:
+    strategy:
+      max-parallel: 5
+      matrix:
+        os: [ "ubuntu-latest", "macos-12", "macos-13", "macos-14", "windows-latest" ]
+        python-version:
+          - "3.8"
+          - "3.9"
+          - "3.10"
+          - "3.11"
+          - "3.12"
+          - "3.13-dev"
+
+    runs-on: "${{ matrix.os }}"
+
+    needs: [ build ]
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4.1.7
+        with:
+          name: wheel
+          path: dist
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip" # caching pip dependencies
+
+      - run: pip install -U pip
+      - run: pip install bencode-rs --no-index --find-link ./dist/
+      - run: pip install -r requirements.txt
+
+      - run: pytest -sv
+        env:
+          RUST_BACKTRACE: 'full'
+
+  audit:
+    name: Audit
+    needs: [ build ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+          cache: "pip" # caching pip dependencies
+
+      - run: pip install -r requirements.txt
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: wheel
+          path: dist
+
+      - run: abi3audit --verbose dist/*.whl
+      - run: pipx run twine check --strict dist/*
