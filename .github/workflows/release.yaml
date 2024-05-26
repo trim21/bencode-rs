@@ -13,6 +13,9 @@ jobs:
     name: Upload wheels to PyPI
     needs: [ build ]
     runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
     steps:
       - uses: actions/download-artifact@v4.1.7
         with:
@@ -20,7 +23,3 @@ jobs:
           path: dist
 
       - uses: pypa/gh-action-pypi-publish@v1.8.14
-        with:
-          #! Update with your project's PyPI API Token Name!
-          user: __token__
-          password: ${{ secrets.PYPI_API_TOKEN }}
