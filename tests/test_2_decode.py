@@ -98,6 +98,7 @@ def test_list(raw: bytes, expected: Any):
         (b"0:", b""),
         (b"4:spam", b"spam"),
         (b"i-3e", -3),
+        (b"i-9223372036854775808e", -9223372036854775808),  # longlong int +1
         (b"i9223372036854775808e", 9223372036854775808),  # longlong int +1
         (b"i18446744073709551616e", 18446744073709551616),  # unsigned long long +1
         # long long int range -9223372036854775808, 9223372036854775807

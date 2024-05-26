@@ -100,28 +100,25 @@ impl<'a> Decoder<'a> {
             }
         }
 
-        if sign > 0 {
-            let mut val: i128 = 0;
+        if sign < 0 {
+            // slow path to build PyLong with python
+            return self.decode_int_slow(index_e);
+        }
 
-            for c_char in self.bytes[num_start..index_e].iter() {
-                let c = *c_char - b'0';
-                val = match val.checked_mul(10).and_then(|v| v.checked_add(c as i128)) {
-                    Some(v) => v,
-                    None => {
-                        return self.decode_int_slow(index_e);
-                        // return Err(PyOverflowError::new_err(format!("int too large at index {}", self.index)));
-                    }
+        let mut val: u128 = 0;
+
+        for c_char in self.bytes[num_start..index_e].iter() {
+            let c = *c_char - b'0';
+            val = match val.checked_mul(10).and_then(|v| v.checked_add(c as u128)) {
+                Some(v) => v,
+                None => {
+                    return self.decode_int_slow(index_e);
                 }
             }
         }
 
-        // val = val * sign;
-        //
-        // self.index = index_e + 1;
-        // return Ok(val.into_py(self.py).into());
-        // // }
-
-        return self.decode_int_slow(index_e);
+        self.index = index_e + 1;
+        return Ok(val.into_py(self.py).into());
     }
 
     fn decode_int_slow(&mut self, index_e: usize) -> Result<PyObject, PyErr> {
