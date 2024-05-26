@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
-use pyo3::ffi::{Py_BuildValue, PyExc_OverflowError, PyLong_FromString};
+use pyo3::ffi::{PyLong_FromString};
 use pyo3::prelude::*;
 use pyo3::{create_exception, PyResult, Python};
 use pyo3::exceptions::PyOverflowError;
@@ -100,41 +100,43 @@ impl<'a> Decoder<'a> {
             }
         }
 
-        // if sign > 0 {
-        let mut val: i128 = 0;
+        if sign > 0 {
+            let mut val: i128 = 0;
 
-        for c_char in self.bytes[num_start..index_e].iter() {
-            let c = *c_char - b'0';
-            val = match val.checked_mul(10).and_then(|v| v.checked_add(c as i128)) {
-                Some(v) => v,
-                None => {
-                    return Err(PyOverflowError::new_err(format!("int too large at index {}", self.index)));
+            for c_char in self.bytes[num_start..index_e].iter() {
+                let c = *c_char - b'0';
+                val = match val.checked_mul(10).and_then(|v| v.checked_add(c as i128)) {
+                    Some(v) => v,
+                    None => {
+                        return self.decode_int_slow(index_e);
+                        // return Err(PyOverflowError::new_err(format!("int too large at index {}", self.index)));
+                    }
                 }
             }
         }
 
-        val = val * sign;
+        // val = val * sign;
+        //
+        // self.index = index_e + 1;
+        // return Ok(val.into_py(self.py).into());
+        // // }
 
-        self.index = index_e + 1;
-        return Ok(val.into_py(self.py).into());
-        // }
-
-        // return self.decode_int_slow(index_e);
+        return self.decode_int_slow(index_e);
     }
 
-    // fn decode_int_slow(&mut self, index_e: usize) -> Result<PyLong, PyErr> {
-    //     let s = self.bytes[self.index..index_e].to_vec();
-    //
-    //     self.index = index_e + 1;
-    //
-    //     let c_str = std::ffi::CString::new(s).unwrap();
-    //     unsafe {
-    //         let ptr = PyLong_FromString(c_str.as_ptr(), std::ptr::null_mut(), 10);
-    //
-    //         // panic!("not implemented");
-    //         return Py::from_owned_ptr_or_err(self.py, ptr);
-    //     };
-    // }
+    fn decode_int_slow(&mut self, index_e: usize) -> Result<PyObject, PyErr> {
+        let s = self.bytes[self.index..index_e].to_vec();
+
+        self.index = index_e + 1;
+
+        let c_str = std::ffi::CString::new(s).unwrap();
+        unsafe {
+            let ptr = PyLong_FromString(c_str.as_ptr(), std::ptr::null_mut(), 10);
+
+            // panic!("not implemented");
+            return Py::from_owned_ptr_or_err(self.py, ptr);
+        };
+    }
 
     fn decode_bytes(&mut self) -> Result<Vec<u8>, PyErr> {
         let index_sep = match self.bytes[self.index..].iter().position(|&b| b == b':') {
@@ -213,7 +215,7 @@ impl<'a> Decoder<'a> {
         self.index += 1;
 
         let mut map: HashMap<Cow<[u8]>, Object> = HashMap::with_capacity(8);
-        // let mut last_key: Option<Cow<[u8]>> = None;
+        let mut last_key: Option<Cow<[u8]>> = None;
         loop {
             match self.bytes.get(self.index) {
                 // unexpected data end
@@ -223,17 +225,16 @@ impl<'a> Decoder<'a> {
                 Some(_) => {
                     let key = self.decode_bytes()?;
                     let value = self.decode_any()?;
-                    // let ck = Cow::from(key.clone());
-                    // if !last_key.is_none() {
-                    //     let lk = last_key.unwrap();
-                    //     if lk > ck {
-                    //         return Err(DecodeError::new_err(format!("dict key not sorted. index {}", self.index)));
-                    //     } else if lk == ck {
-                    //         return Err(DecodeError::new_err(format!("duplicated dict key found: index {}", self.index)));
-                    //     }
-                    // }
-                    map.insert(Cow::from(key), value);
-                    // last_key = Some(ck.clone());
+                    let ck = Cow::from(key.clone());
+                    if let Some(lk) = last_key {
+                        if lk > ck {
+                            return Err(DecodeError::new_err(format!("dict key not sorted. index {}", self.index)));
+                        } else if lk == ck {
+                            return Err(DecodeError::new_err(format!("duplicated dict key found: index {}", self.index)));
+                        }
+                    }
+                    map.insert(ck.clone(), value);
+                    last_key = Some(ck);
                 }
             }
         }
