@@ -16,6 +16,7 @@ dependencies = [
  "itoa",
  "pyo3",
  "smallvec",
+ "syncpool",
 ]
 
 [[package]]
@@ -226,6 +227,12 @@ dependencies = [
  "quote",
  "unicode-ident",
 ]
+
+[[package]]
+name = "syncpool"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "276c1fc00f41ad03bdcf390e81f967adfdb9c828c0a967e1c92df8050471c6bd"
 
 [[package]]
 name = "target-lexicon"

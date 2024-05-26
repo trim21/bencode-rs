@@ -8,6 +8,8 @@ use pyo3::prelude::*;
 
 #[pymodule]
 fn _bencode(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    encode::init();
+
     m.add_function(wrap_pyfunction!(encode::bencode, m)?)?;
     m.add_function(wrap_pyfunction!(decode::bdecode, m)?)?;
     m.add(

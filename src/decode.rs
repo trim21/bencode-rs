@@ -3,27 +3,35 @@ use std::collections::HashMap;
 use pyo3::ffi::{PyLong_FromString};
 use pyo3::prelude::*;
 use pyo3::{create_exception, PyResult, Python};
-use pyo3::exceptions::PyOverflowError;
-use pyo3::types::{PyBytes, PyDict, PyLong};
+use pyo3::exceptions::{PyTypeError};
+use pyo3::types::{PyBytes, PyDict};
 
 create_exception!(bencode_rs,BencodeDecodeError, pyo3::exceptions::PyException);
 
 type DecodeError = BencodeDecodeError;
 
 #[pyfunction]
-pub fn bdecode<'py>(py: Python<'py>, b: Bound<'py, PyBytes>) -> PyResult<Bound<'py, PyAny>> {
-    if b.len().unwrap() == 0 {
-        return Err(DecodeError::new_err("empty byte sequence"));
+#[pyo3(text_signature = "(b: Bytes, /)")]
+pub fn bdecode<'py>(py: Python<'py>, b: Py<PyAny>) -> PyResult<Py<PyAny>> {
+    let buf = match b.downcast_bound::<PyBytes>(py) {
+        Err(_) => {
+            return Err(PyTypeError::new_err("can only decode bytes"));
+        }
+        Ok(b) => b
+    };
+
+    if buf.len()? == 0 {
+        return Err(DecodeError::new_err("empty bytes"));
     }
 
     let mut ctx = Decoder {
-        bytes: b.as_bytes().to_vec(),
+        bytes: buf.as_bytes().to_vec(),
         index: 0,
         py,
-        depth: 0,
+        // depth: 0,
     };
 
-    return Ok(ctx.decode_any()?.into_bound(py));
+    return Ok(ctx.decode_any()?.into_any());
 }
 
 
@@ -35,7 +43,7 @@ struct Decoder<'a> {
     bytes: Vec<u8>,
     index: usize, // any torrent file larger than 4GiB?
     py: Python<'a>,
-    depth: usize,
+    // depth: usize,
 }
 
 impl<'a> Decoder<'a> {
@@ -101,8 +109,28 @@ impl<'a> Decoder<'a> {
         }
 
         if sign < 0 {
-            // slow path to build PyLong with python
-            return self.decode_int_slow(index_e);
+            let mut val: i128 = 0;
+
+            for c_char in self.bytes[num_start..index_e].iter() {
+                let c = *c_char - b'0';
+                val = match val.checked_mul(10).and_then(|v| v.checked_add(c as i128)) {
+                    Some(v) => v,
+                    None => {
+                        return self.decode_int_slow(index_e);
+                    }
+                }
+            }
+
+            val = match val.checked_mul(-1) {
+                Some(v) => v,
+                None => {
+                    // slow path to build PyLong with python
+                    return self.decode_int_slow(index_e);
+                }
+            };
+
+            self.index = index_e + 1;
+            return Ok(val.into_py(self.py).into());
         }
 
         let mut val: u128 = 0;
@@ -121,16 +149,16 @@ impl<'a> Decoder<'a> {
         return Ok(val.into_py(self.py).into());
     }
 
+    // support int may overflow i128/u128
     fn decode_int_slow(&mut self, index_e: usize) -> Result<PyObject, PyErr> {
         let s = self.bytes[self.index..index_e].to_vec();
 
         self.index = index_e + 1;
 
         let c_str = std::ffi::CString::new(s).unwrap();
+
         unsafe {
             let ptr = PyLong_FromString(c_str.as_ptr(), std::ptr::null_mut(), 10);
-
-            // panic!("not implemented");
             return Py::from_owned_ptr_or_err(self.py, ptr);
         };
     }
