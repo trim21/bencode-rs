@@ -11,7 +11,7 @@ jobs:
 
   upload_all:
     name: Upload wheels to PyPI
-    needs: [ build ]
+    needs: [build]
     runs-on: ubuntu-latest
     environment: pypi
     permissions:

@@ -197,13 +197,13 @@ fn encode_dict<'py>(ctx: &mut Context, py: Python<'py>, v: &Bound<'py, PyDict>) 
     for item in v.items().iter() {
         let (key, value): (PyObject, Bound<'_, PyAny>) = item.extract()?;
 
-        if let Ok(d) = key.extract::<&PyString>(py) {
+        if let Ok(d) = key.downcast_bound::<PyString>(py) {
             let bb = d.to_string();
             sv.push((bb, value));
             continue;
         }
 
-        if let Ok(d) = key.extract::<&PyBytes>(py) {
+        if let Ok(d) = key.downcast_bound::<PyBytes>(py) {
             sv.push((String::from_utf8(d.as_bytes().into())?, value));
             continue;
         }

@@ -15,25 +15,37 @@ sys.set_int_max_str_digits(20000)
 tracemalloc.start()
 
 while True:
-
-    class C:
-        pass
-
     s = b"100:" + secrets.token_bytes(10)
-    # t = bencode([s, s, s])
-    # i = 0
+
     for c in [i for i in range(5000)]:
-        # i += 1
+
+        class C:
+            pass
+
         try:
             bdecode(s)
         except BencodeDecodeError:
             pass
+
         try:
-            bencode([1, 2, "a", b"b", C(), None])
+            bencode([1, 2, "a", b"b", None])
         except TypeError:
             pass
 
-        # bencode(True)
+        try:
+            bencode([1, 2, "a", b"b", C()])
+        except TypeError:
+            pass
+
+        try:
+            bencode({"0": s, "2": [True, C()], "3": None})
+        except TypeError:
+            pass
+
+        try:
+            bencode({"1": C()})
+        except TypeError:
+            pass
 
     gc.collect()
     v = tracemalloc.get_tracemalloc_memory()
