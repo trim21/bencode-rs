@@ -6,5 +6,8 @@
   "lockFileMaintenance": {
     "enabled": true
   },
+  "cargo": {
+    "enabled": true
+  },
   "rangeStrategy": "bump"
 }
