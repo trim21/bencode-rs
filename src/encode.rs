@@ -9,6 +9,7 @@ use pyo3::{
     types::{PyBytes, PyDict, PyInt, PyList, PyString, PyTuple},
 };
 use smallvec::SmallVec;
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::io::Write;
 use syncpool::SyncPool;
@@ -81,7 +82,7 @@ impl Context {
 
 fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: Bound<'py, PyAny>) -> PyResult<()> {
     if let Ok(s) = value.downcast::<PyString>() {
-        let str = s.to_string();
+        let str = s.to_str()?;
         ctx.write_int(str.len())?;
         ctx.buf.put_u8(b':');
         ctx.buf.put(str.as_bytes());
@@ -110,6 +111,21 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: Bound<'py, PyAny>)
     }
 
     let ptr = value.as_ptr().cast::<()>() as usize;
+
+    if let Ok(dict) = value.downcast::<PyDict>() {
+        if ctx.seen.contains(&ptr) {
+            let repr = value.repr()?.to_string();
+            return Err(PyValueError::new_err(format!(
+                "circular reference found: {repr}"
+            )));
+        }
+        ctx.seen.insert(ptr);
+
+        encode_dict(ctx, py, dict)?;
+
+        ctx.seen.remove(&ptr);
+        return Ok(());
+    }
 
     if let Ok(seq) = value.downcast::<PyList>() {
         if ctx.seen.contains(&ptr) {
@@ -153,21 +169,6 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: Bound<'py, PyAny>)
         return Ok(());
     }
 
-    if let Ok(dict) = value.downcast::<PyDict>() {
-        if ctx.seen.contains(&ptr) {
-            let repr = value.repr()?.to_string();
-            return Err(PyValueError::new_err(format!(
-                "circular reference found: {repr}"
-            )));
-        }
-        ctx.seen.insert(ptr);
-
-        encode_dict(ctx, py, dict)?;
-
-        ctx.seen.remove(&ptr);
-        return Ok(());
-    }
-
     let typ = value.get_type();
     let name = typ.name()?;
 
@@ -175,10 +176,10 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: Bound<'py, PyAny>)
 }
 
 #[inline]
-fn __encode_str<'py>(v: String, ctx: &mut Context) -> PyResult<()> {
+fn __encode_str<'py>(v: Cow<[u8]>, ctx: &mut Context) -> PyResult<()> {
     ctx.write_int(v.len())?;
     ctx.buf.put_u8(b':');
-    ctx.buf.put(v.as_bytes());
+    ctx.buf.put(v.as_ref());
 
     return Ok(());
 }
@@ -186,19 +187,19 @@ fn __encode_str<'py>(v: String, ctx: &mut Context) -> PyResult<()> {
 fn encode_dict<'py>(ctx: &mut Context, py: Python<'py>, v: &Bound<'py, PyDict>) -> PyResult<()> {
     ctx.buf.put_u8(b'd');
 
-    let mut sv: SmallVec<[(String, Bound<'_, PyAny>); 8]> = SmallVec::with_capacity(v.len());
+    let mut sv: SmallVec<[(Cow<[u8]>, Bound<'_, PyAny>); 8]> = SmallVec::with_capacity(v.len());
 
     for item in v.items().iter() {
         let (key, value): (PyObject, Bound<'_, PyAny>) = item.extract()?;
 
         if let Ok(d) = key.downcast_bound::<PyString>(py) {
-            let bb = d.to_string();
-            sv.push((bb, value));
+            let bb = d.to_str()?;
+            sv.push((Cow::Owned(bb.as_bytes().to_vec()), value));
             continue;
         }
 
         if let Ok(d) = key.downcast_bound::<PyBytes>(py) {
-            sv.push((String::from_utf8(d.as_bytes().into())?, value));
+            sv.push((Cow::Owned(d.as_bytes().to_vec()), value));
             continue;
         }
 
@@ -212,11 +213,11 @@ fn encode_dict<'py>(ctx: &mut Context, py: Python<'py>, v: &Bound<'py, PyDict>) 
 
     sv.sort_unstable_by(|a, b| a.0.cmp(&b.0));
 
-    let mut last_key: Option<String> = None;
+    let mut last_key: Option<Cow<[u8]>> = None;
     for (key, _) in sv.clone() {
         if let Some(lk) = last_key {
             if lk == key {
-                return Err(EncodeError::new_err(format!("Duplicated keys {key}")));
+                return Err(EncodeError::new_err(format!("Duplicated keys {}", String::from_utf8(lk.into())?)));
             }
         }
 

@@ -1,6 +1,7 @@
 # build
 maturin>=1.5,<2.0
 abi3audit
+pip
 # lint
 pre-commit
 # testing
