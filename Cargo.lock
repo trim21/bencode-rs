@@ -14,6 +14,7 @@ version = "0.0.0"
 dependencies = [
  "bytes",
  "itoa",
+ "once_cell",
  "pyo3",
  "smallvec",
  "syncpool",

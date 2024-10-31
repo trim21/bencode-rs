@@ -5,7 +5,7 @@ build-backend = "maturin"
 [project]
 name = "bencode-rs"
 version = "0.0.4"
-requires-python = ">=3.8,<4.0"
+requires-python = "~=3.9"
 description = "a bencode parser binding build with pyo3"
 readme = "readme.md"
 classifiers = [

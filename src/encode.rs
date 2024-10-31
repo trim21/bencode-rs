@@ -1,20 +1,23 @@
-use std::collections::HashSet;
-
 use bytes::{BufMut, BytesMut};
-use pyo3::{create_exception, exceptions::PyTypeError, prelude::*, types::{PyBool, PyBytes, PyDict, PyInt, PyList, PyString, PyTuple}};
+use once_cell::sync::Lazy;
 use pyo3::exceptions::PyValueError;
+use pyo3::{
+    create_exception,
+    exceptions::PyTypeError,
+    prelude::*,
+    types::{PyBool, PyBytes, PyDict, PyInt, PyList, PyString, PyTuple},
+};
 use smallvec::SmallVec;
+use std::collections::HashSet;
 use syncpool::SyncPool;
 
-create_exception!(bencode_rs, BencodeEncodeError, pyo3::exceptions::PyException);
+create_exception!(
+    bencode_rs,
+    BencodeEncodeError,
+    pyo3::exceptions::PyException
+);
 
 pub const MIB: usize = 1_048_576;
-
-pub fn init() {
-    unsafe {
-        CONTEXT_POOL.replace(SyncPool::with_builder(Context::initializer));
-    }
-}
 
 #[pyfunction]
 #[pyo3(text_signature = "(v: Any, /)")]
@@ -33,35 +36,32 @@ pub fn bencode<'py>(py: Python<'py>, v: Bound<'py, PyAny>) -> PyResult<Bound<'py
 
 type EncodeError = BencodeEncodeError;
 
-static mut CONTEXT_POOL: Option<SyncPool<Context>> = None;
+static mut CONTEXT_POOL: Lazy<SyncPool<Context>> = Lazy::new(|| SyncPool::new());
 
 fn get_ctx() -> Box<Context> {
     unsafe {
-        CONTEXT_POOL.as_mut().unwrap().get()
+        return CONTEXT_POOL.get();
     }
 }
 
 fn release_ctx(mut ctx: Box<Context>) -> () {
-    // do not store large buffers
-    // who encode torrent >= 100 MiB normally?
     if ctx.buf.capacity() > 100 * MIB {
         return;
     }
     ctx.buf.clear();
     ctx.seen.clear();
     unsafe {
-        CONTEXT_POOL.as_mut().unwrap().put(ctx);
+        CONTEXT_POOL.put(ctx);
     }
 }
-
 
 struct Context {
     buf: BytesMut,
     seen: HashSet<usize>,
 }
 
-impl Context {
-    fn initializer() -> Self {
+impl Default for Context {
+    fn default() -> Self {
         Self {
             buf: BytesMut::with_capacity(4096),
             seen: HashSet::with_capacity(100),
@@ -116,10 +116,10 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: Bound<'py, PyAny>)
 
     if let Ok(seq) = value.downcast::<PyList>() {
         if ctx.seen.contains(&ptr) {
-            let repr = value.repr().unwrap().to_string();
-            return Err(PyValueError::new_err(
-                format!("circular reference found {repr}")
-            ));
+            let repr = value.repr()?.to_string();
+            return Err(PyValueError::new_err(format!(
+                "circular reference found {repr}"
+            )));
         }
 
         ctx.seen.insert(ptr);
@@ -137,10 +137,10 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: Bound<'py, PyAny>)
 
     if let Ok(seq) = value.downcast::<PyTuple>() {
         if ctx.seen.contains(&ptr) {
-            let repr = value.repr().unwrap().to_string();
-            return Err(PyValueError::new_err(
-                format!("circular reference found {repr}")
-            ));
+            let repr = value.repr()?.to_string();
+            return Err(PyValueError::new_err(format!(
+                "circular reference found {repr}"
+            )));
         }
 
         ctx.seen.insert(ptr);
@@ -156,10 +156,9 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: Bound<'py, PyAny>)
         return Ok(());
     }
 
-
     if let Ok(dict) = value.downcast::<PyDict>() {
         if ctx.seen.contains(&ptr) {
-            let repr = value.repr().unwrap().to_string();
+            let repr = value.repr()?.to_string();
             return Err(PyValueError::new_err(format!(
                 "circular reference found: {repr}"
             )));
@@ -211,7 +210,9 @@ fn encode_dict<'py>(ctx: &mut Context, py: Python<'py>, v: &Bound<'py, PyDict>) 
         let typ = value.get_type();
         let name = typ.name()?;
 
-        return Err(PyTypeError::new_err(format!("Unsupported type '{name}' as dict key")));
+        return Err(PyTypeError::new_err(format!(
+            "Unsupported type '{name}' as dict key"
+        )));
     }
 
     sv.sort_unstable_by(|a, b| a.0.cmp(&b.0));
@@ -220,9 +221,7 @@ fn encode_dict<'py>(ctx: &mut Context, py: Python<'py>, v: &Bound<'py, PyDict>) 
     for (key, _) in sv.clone() {
         if let Some(lk) = last_key {
             if lk == key {
-                return Err(EncodeError::new_err(format!(
-                    "Duplicated keys {key}"
-                )));
+                return Err(EncodeError::new_err(format!("Duplicated keys {key}")));
             }
         }
 
