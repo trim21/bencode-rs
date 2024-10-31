@@ -1,14 +1,16 @@
 use bytes::{BufMut, BytesMut};
+use num;
 use once_cell::sync::Lazy;
 use pyo3::exceptions::PyValueError;
 use pyo3::{
     create_exception,
     exceptions::PyTypeError,
     prelude::*,
-    types::{PyBool, PyBytes, PyDict, PyInt, PyList, PyString, PyTuple},
+    types::{PyBytes, PyDict, PyInt, PyList, PyString, PyTuple},
 };
 use smallvec::SmallVec;
 use std::collections::HashSet;
+use std::io::Write;
 use syncpool::SyncPool;
 
 create_exception!(
@@ -69,11 +71,18 @@ impl Default for Context {
     }
 }
 
+
+impl Context {
+    fn write_int<I: num::Integer + std::fmt::Display>(self: &mut Context, val: I) -> std::io::Result<()> {
+        std::write!((&mut self.buf).writer(), "{}", val)?;
+        Ok(())
+    }
+}
+
 fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: Bound<'py, PyAny>) -> PyResult<()> {
     if let Ok(s) = value.downcast::<PyString>() {
         let str = s.to_string();
-        let mut buffer = itoa::Buffer::new();
-        ctx.buf.put(buffer.format(str.len()).as_bytes());
+        ctx.write_int(str.len())?;
         ctx.buf.put_u8(b':');
         ctx.buf.put(str.as_bytes());
 
@@ -81,34 +90,22 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: Bound<'py, PyAny>)
     }
 
     if let Ok(bytes) = value.downcast::<PyBytes>() {
-        let mut buffer = itoa::Buffer::new();
-        ctx.buf.put(buffer.format(bytes.len()?).as_bytes());
+        let b = bytes.as_bytes();
+
+        ctx.write_int(b.len())?;
         ctx.buf.put_u8(b':');
-        ctx.buf.put(bytes.as_bytes());
+        ctx.buf.put(b);
 
-        return Ok(());
-    }
-
-    if let Ok(bool) = value.downcast::<PyBool>() {
-        ctx.buf.put_u8(b'i');
-
-        if bool.is_true() {
-            ctx.buf.put_u8(b'1');
-        } else {
-            ctx.buf.put_u8(b'0');
-        }
-
-        ctx.buf.put_u8(b'e');
         return Ok(());
     }
 
     if let Ok(int) = value.downcast::<PyInt>() {
         let v: i128 = int.extract()?;
-        let mut buffer = itoa::Buffer::new();
 
         ctx.buf.put_u8(b'i');
-        ctx.buf.put(buffer.format(v).as_bytes());
+        ctx.write_int(v)?;
         ctx.buf.put_u8(b'e');
+
         return Ok(());
     }
 
@@ -178,12 +175,10 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: Bound<'py, PyAny>)
 }
 
 #[inline]
-fn _encode_str<'py>(v: String, buf: &mut BytesMut) -> PyResult<()> {
-    let mut buffer = itoa::Buffer::new();
-
-    buf.put(buffer.format(v.len()).as_bytes());
-    buf.put_u8(b':');
-    buf.put(v.as_bytes());
+fn __encode_str<'py>(v: String, ctx: &mut Context) -> PyResult<()> {
+    ctx.write_int(v.len())?;
+    ctx.buf.put_u8(b':');
+    ctx.buf.put(v.as_bytes());
 
     return Ok(());
 }
@@ -229,7 +224,7 @@ fn encode_dict<'py>(ctx: &mut Context, py: Python<'py>, v: &Bound<'py, PyDict>) 
     }
 
     for (key, value) in sv {
-        _encode_str(key, &mut ctx.buf)?;
+        __encode_str(key, ctx)?;
         encode_any(ctx, py, value.into_any())?;
     }
 
