@@ -64,6 +64,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -72,8 +73,8 @@ jobs:
           cache: "pip"
 
       - run: pip install -r requirements.txt
-      - run: maturin build --release
-      - run: pip install bencode-rs --no-index --find-links ./target/
+      - run: maturin build --release --out dist
+      - run: pip install bencode-rs --no-index --find-links ./dist/
 
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v3
