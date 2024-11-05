@@ -43,18 +43,3 @@ def test_benchmark_decode_single_file_torrent(benchmark):
 
 def test_benchmark_encode_single_file_torrent(benchmark):
     benchmark(bencode2.bencode, bencode2.bdecode(single_file_torrent))
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class AnnounceCompatResponse:
-    interval: int
-    peers: bytes
-    peers6: bytes
-    # "interval": 3600,
-    # 50 peers
-    # "peers": b"1" * 6 * 50,
-    # "peers6": b"1" * 18 * 50,
-
-
-def test_benchmark_encode_compact_peers_dataclass(benchmark):
-    benchmark(bencode2.bencode, AnnounceCompatResponse(**compat_peers_py))
