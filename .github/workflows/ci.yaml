@@ -72,9 +72,8 @@ jobs:
           cache: "pip"
 
       - run: pip install -r requirements.txt
-      - run: |
-          export VIRTUAL_ENV=$(python3 -c 'import sys; print(sys.base_prefix)')
-          maturin develop --release
+      - run: maturin build --release
+      - run: pip install bencode-rs --no-index --find-links ./dist/
 
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v3
