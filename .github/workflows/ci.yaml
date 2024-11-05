@@ -73,7 +73,7 @@ jobs:
 
       - run: pip install -r requirements.txt
       - run: maturin build --release
-      - run: pip install bencode-rs --no-index --find-links ./dist/
+      - run: pip install bencode-rs --no-index --find-links ./target/
 
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v3
