@@ -2,12 +2,7 @@ use bytes::{BufMut, BytesMut};
 use num;
 use once_cell::sync::Lazy;
 use pyo3::exceptions::PyValueError;
-use pyo3::{
-    create_exception,
-    exceptions::PyTypeError,
-    prelude::*,
-    types::{PyBytes, PyDict, PyInt, PyList, PyString, PyTuple},
-};
+use pyo3::{create_exception, exceptions::PyTypeError, prelude::*, types::{PyBytes, PyDict, PyInt, PyList, PyString, PyTuple}};
 use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::collections::HashSet;
@@ -26,6 +21,7 @@ pub const MIB: usize = 1_048_576;
 #[pyo3(text_signature = "(v: Any, /)")]
 pub fn bencode<'py>(py: Python<'py>, v: Bound<'py, PyAny>) -> PyResult<Bound<'py, PyBytes>> {
     let mut ctx = get_ctx();
+    // let mut ctx = Context::default();
     // let mut ctx = Context::initializer();
 
     encode_any(&mut ctx, py, v)?;
@@ -75,7 +71,7 @@ impl Default for Context {
 
 impl Context {
     fn write_int<I: num::Integer + std::fmt::Display>(self: &mut Context, val: I) -> std::io::Result<()> {
-        std::write!((&mut self.buf).writer(), "{}", val)?;
+        std::write!((&mut self.buf).writer(), "{val}")?;
         Ok(())
     }
 }
@@ -190,16 +186,23 @@ fn encode_dict<'py>(ctx: &mut Context, py: Python<'py>, v: &Bound<'py, PyDict>) 
     let mut sv: SmallVec<[(Cow<[u8]>, Bound<'_, PyAny>); 8]> = SmallVec::with_capacity(v.len());
 
     for item in v.items().iter() {
-        let (key, value): (PyObject, Bound<'_, PyAny>) = item.extract()?;
+        let (key, value): (Bound<'py, PyAny>, Bound<'_, PyAny>) = item.extract()?;
 
-        if let Ok(d) = key.downcast_bound::<PyString>(py) {
-            let bb = d.to_str()?;
-            sv.push((Cow::Owned(bb.as_bytes().to_vec()), value));
+        if let Ok(s) = key.downcast::<PyString>() {
+            let b = s.to_str()?;
+            unsafe {
+                sv.push((Cow::from(std::mem::transmute::<&[u8], &'py [u8]>(b.as_bytes())), value));
+            }
             continue;
         }
 
-        if let Ok(d) = key.downcast_bound::<PyBytes>(py) {
-            sv.push((Cow::Owned(d.as_bytes().to_vec()), value));
+        if let Ok(b) = key.downcast::<PyBytes>() {
+            unsafe {
+                // d.as_bytes() return a &[u8] and doesn't live longer than variable `key`,
+                // but it's not ture, &[u8] lives as long as python ptr lives,
+                // which is longer than variable `key` and we do not need to drop it.
+                sv.push((Cow::from(std::mem::transmute::<&[u8], &'py [u8]>(b.as_bytes())), value));
+            }
             continue;
         }
 

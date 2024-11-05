@@ -1,10 +1,10 @@
 use std::borrow::Cow;
 
-use pyo3::{create_exception, PyResult, Python};
 use pyo3::exceptions::PyTypeError;
 use pyo3::ffi::PyLong_FromString;
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict};
+use pyo3::types::{PyBytes, PyDict, PyList};
+use pyo3::{create_exception, PyResult, Python};
 
 create_exception!(bencode_rs,BencodeDecodeError, pyo3::exceptions::PyException);
 
@@ -49,7 +49,7 @@ impl<'a> Decoder<'a> {
             b'0'..=b'9' => {
                 let bytes = self.decode_bytes()?;
 
-                return Ok(Cow::from(bytes).into_py(self.py));
+                return Ok(bytes.into_py(self.py));
             }
             b'l' => {
                 let list = self.decode_list()?;
@@ -61,7 +61,7 @@ impl<'a> Decoder<'a> {
         };
     }
 
-    fn decode_bytes(&mut self) -> Result<Vec<u8>, PyErr> {
+    fn decode_bytes(&mut self) -> Result<&'a [u8], PyErr> {
         let index_sep = match self.bytes[self.index..].iter().position(|&b| b == b':') {
             Some(i) => i,
             None => {
@@ -96,7 +96,7 @@ impl<'a> Decoder<'a> {
 
         self.index = bytes_end + 1;
 
-        let str_buff: Vec<u8> = self.bytes[bytes_start..=bytes_end].to_vec();
+        let str_buff: &[u8] = self.bytes[bytes_start..=bytes_end].as_ref();
 
         return Ok(str_buff);
     }
@@ -195,11 +195,11 @@ impl<'a> Decoder<'a> {
 
     // support int may overflow i128/u128
     fn decode_int_slow(&mut self, index_e: usize) -> Result<PyObject, PyErr> {
-        let s = self.bytes[self.index..index_e].to_vec();
+        let s = &self.bytes[self.index..index_e];
 
         self.index = index_e + 1;
 
-        let c_str = std::ffi::CString::new(s).unwrap();
+        let c_str = std::ffi::CString::new(&*s)?;
 
         unsafe {
             let ptr = PyLong_FromString(c_str.as_ptr(), std::ptr::null_mut(), 10);
@@ -209,7 +209,7 @@ impl<'a> Decoder<'a> {
 
     fn decode_list(&mut self) -> PyResult<PyObject> {
         self.index += 1;
-        let mut l = Vec::<PyObject>::with_capacity(16);
+        let mut l = smallvec::SmallVec::<[PyObject; 8]>::new();
 
         loop {
             match self.bytes.get(self.index) {
@@ -226,7 +226,7 @@ impl<'a> Decoder<'a> {
         self.index += 1;
 
 
-        Ok(l.into_py(self.py))
+        Ok(PyList::new_bound(self.py, l).into())
     }
 
     fn decode_dict(&mut self) -> Result<PyObject, PyErr> {
