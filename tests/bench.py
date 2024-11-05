@@ -2,7 +2,7 @@ import dataclasses
 import sys
 from pathlib import Path
 
-import bencode_rs
+import bencode_rs as bencode2
 
 # a parametrize to make codspeed add python version to benchmark
 py = f"{sys.version_info.major}.{sys.version_info.minor}"
