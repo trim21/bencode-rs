@@ -1,5 +1,4 @@
 use bytes::{BufMut, BytesMut};
-use num;
 use once_cell::sync::Lazy;
 use pyo3::exceptions::PyValueError;
 use pyo3::{
@@ -35,20 +34,20 @@ pub fn bencode<'py>(py: Python<'py>, v: Bound<'py, PyAny>) -> PyResult<Bound<'py
 
     release_ctx(ctx);
 
-    return Ok(r);
+    Ok(r)
 }
 
 type EncodeError = BencodeEncodeError;
 
-static mut CONTEXT_POOL: Lazy<SyncPool<Context>> = Lazy::new(|| SyncPool::new());
+static mut CONTEXT_POOL: Lazy<SyncPool<Context>> = Lazy::new(SyncPool::new);
 
 fn get_ctx() -> Box<Context> {
     unsafe {
-        return CONTEXT_POOL.get();
+        CONTEXT_POOL.get()
     }
 }
 
-fn release_ctx(mut ctx: Box<Context>) -> () {
+fn release_ctx(mut ctx: Box<Context>) {
     if ctx.buf.capacity() > 100 * MIB {
         return;
     }
@@ -175,21 +174,22 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: Bound<'py, PyAny>)
     let typ = value.get_type();
     let name = typ.name()?;
 
-    return Err(PyTypeError::new_err(format!("Unsupported type '{name}'")));
+    Err(PyTypeError::new_err(format!("Unsupported type '{name}'")))
 }
 
 #[inline]
-fn __encode_str<'py>(v: Cow<[u8]>, ctx: &mut Context) -> PyResult<()> {
+fn __encode_str(v: Cow<[u8]>, ctx: &mut Context) -> PyResult<()> {
     ctx.write_int(v.len())?;
     ctx.buf.put_u8(b':');
     ctx.buf.put(v.as_ref());
 
-    return Ok(());
+    Ok(())
 }
 
 fn encode_dict<'py>(ctx: &mut Context, py: Python<'py>, v: &Bound<'py, PyDict>) -> PyResult<()> {
     ctx.buf.put_u8(b'd');
 
+    #[allow(clippy::type_complexity)]
     let mut sv: SmallVec<[(Cow<[u8]>, Bound<'_, PyAny>); 8]> = SmallVec::with_capacity(v.len());
 
     for item in v.items().iter() {
@@ -250,5 +250,5 @@ fn encode_dict<'py>(ctx: &mut Context, py: Python<'py>, v: &Bound<'py, PyDict>) 
 
     ctx.buf.put_u8(b'e');
 
-    return Ok(());
+    Ok(())
 }

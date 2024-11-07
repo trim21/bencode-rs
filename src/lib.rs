@@ -1,4 +1,4 @@
-#![deny(clippy::implicit_return)]
+#![allow(clippy::implicit_return)]
 #![deny(clippy::needless_return)]
 
 mod decode;
@@ -18,5 +18,5 @@ fn _bencode(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
         "BencodeDecodeError",
         py.get_type_bound::<decode::BencodeDecodeError>(),
     )?;
-    return Ok(());
+    Ok(())
 }
