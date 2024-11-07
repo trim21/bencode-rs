@@ -16,8 +16,8 @@ type DecodeError = BencodeDecodeError;
 
 #[pyfunction]
 #[pyo3(text_signature = "(b: Bytes, /)")]
-pub fn bdecode<'py>(py: Python<'py>, b: Py<PyAny>) -> PyResult<PyObject> {
-    let buf = match b.downcast_bound::<PyBytes>(py) {
+pub fn bdecode(b: &Bound<'_, PyAny>) -> PyResult<PyObject> {
+    let buf = match b.downcast::<PyBytes>() {
         Err(_) => {
             return Err(PyTypeError::new_err("can only decode bytes"));
         },
@@ -31,11 +31,11 @@ pub fn bdecode<'py>(py: Python<'py>, b: Py<PyAny>) -> PyResult<PyObject> {
     let mut ctx = Decoder {
         bytes: buf.as_bytes(),
         index: 0,
-        py,
+        py: b.py(),
         // depth: 0,
     };
 
-    return Ok(ctx.decode_any()?);
+    ctx.decode_any()
 }
 
 struct Decoder<'a> {
@@ -47,21 +47,21 @@ struct Decoder<'a> {
 
 impl<'a> Decoder<'a> {
     fn decode_any(&mut self) -> Result<PyObject, PyErr> {
-        return match self.current_byte()? {
+        match self.current_byte()? {
             b'i' => self.decode_int(),
             b'0'..=b'9' => {
                 let bytes = self.decode_bytes()?;
 
-                return Ok(bytes.into_py(self.py));
+                Ok(bytes.into_py(self.py))
             },
             b'l' => {
                 let list = self.decode_list()?;
 
-                return Ok(list.into_any());
+                Ok(list.into_any())
             },
             b'd' => self.decode_dict(),
-            _ => return Err(DecodeError::new_err("invalid leading byte")),
-        };
+            _ => Err(DecodeError::new_err("invalid leading byte")),
+        }
     }
 
     fn decode_bytes(&mut self) -> Result<&'a [u8], PyErr> {
@@ -83,7 +83,7 @@ impl<'a> Decoder<'a> {
         }
 
         let mut len: usize = 0;
-        for c in self.bytes[self.index..index_sep].iter() {
+        for c in &self.bytes[self.index..index_sep] {
             len = len * 10 + (c - b'0') as usize;
         }
 
@@ -101,7 +101,7 @@ impl<'a> Decoder<'a> {
 
         let str_buff: &[u8] = self.bytes[bytes_start..=bytes_end].as_ref();
 
-        return Ok(str_buff);
+        Ok(str_buff)
     }
 
     fn decode_int(&mut self) -> Result<PyObject, PyErr> {
@@ -148,7 +148,7 @@ impl<'a> Decoder<'a> {
             _ => {},
         }
 
-        for c in self.bytes[num_start..index_e].iter() {
+        for c in &self.bytes[num_start..index_e] {
             if !(b'0' <= *c && *c <= b'9') {
                 return Err(DecodeError::new_err(format!(
                     "invalid int, '{}' found at {}",
@@ -160,9 +160,12 @@ impl<'a> Decoder<'a> {
         if sign < 0 {
             let mut val: i64 = 0;
 
-            for c_char in self.bytes[num_start..index_e].iter() {
+            for c_char in &self.bytes[num_start..index_e] {
                 let c = *c_char - b'0';
-                val = match val.checked_mul(10).and_then(|v| v.checked_add(c as i64)) {
+                val = match val
+                    .checked_mul(10)
+                    .and_then(|v| v.checked_add(i64::from(c)))
+                {
                     Some(v) => v,
                     None => {
                         return self.decode_int_slow(index_e);
@@ -179,14 +182,17 @@ impl<'a> Decoder<'a> {
             };
 
             self.index = index_e + 1;
-            return Ok(val.into_py(self.py).into());
+            return Ok(val.into_py(self.py));
         }
 
         let mut val: u64 = 0;
 
-        for c_char in self.bytes[num_start..index_e].iter() {
+        for c_char in &self.bytes[num_start..index_e] {
             let c = *c_char - b'0';
-            val = match val.checked_mul(10).and_then(|v| v.checked_add(c as u64)) {
+            val = match val
+                .checked_mul(10)
+                .and_then(|v| v.checked_add(u64::from(c)))
+            {
                 Some(v) => v,
                 None => {
                     return self.decode_int_slow(index_e);
@@ -195,7 +201,7 @@ impl<'a> Decoder<'a> {
         }
 
         self.index = index_e + 1;
-        return Ok(val.into_py(self.py).into());
+        Ok(val.into_py(self.py))
     }
 
     // support int may overflow i128/u128
@@ -204,12 +210,12 @@ impl<'a> Decoder<'a> {
 
         self.index = index_e + 1;
 
-        let c_str = std::ffi::CString::new(&*s)?;
+        let c_str = std::ffi::CString::new(s)?;
 
         unsafe {
             let ptr = PyLong_FromString(c_str.as_ptr(), std::ptr::null_mut(), 10);
-            return Py::from_owned_ptr_or_err(self.py, ptr);
-        };
+            Py::from_owned_ptr_or_err(self.py, ptr)
+        }
     }
 
     fn decode_list(&mut self) -> PyResult<PyObject> {
@@ -232,7 +238,7 @@ impl<'a> Decoder<'a> {
 
         self.index += 1;
 
-        Ok(PyList::new_bound(self.py, l).into())
+        return Ok(PyList::new_bound(self.py, l).into());
     }
 
     fn decode_dict(&mut self) -> Result<PyObject, PyErr> {
@@ -257,7 +263,9 @@ impl<'a> Decoder<'a> {
                                 "dict key not sorted. index {}",
                                 self.index
                             )));
-                        } else if lk == ck {
+                        }
+
+                        if lk == ck {
                             return Err(DecodeError::new_err(format!(
                                 "duplicated dict key found: index {}",
                                 self.index
@@ -272,7 +280,7 @@ impl<'a> Decoder<'a> {
         }
 
         self.index += 1;
-        return Ok(d.into_py(self.py));
+        Ok(d.into_py(self.py))
     }
 
     fn current_byte(&self) -> Result<u8, PyErr> {
