@@ -232,7 +232,7 @@ impl<'a> Decoder<'a> {
 
         self.index += 1;
 
-        return Ok(PyList::new_bound(self.py, l).into())
+        return Ok(PyList::new_bound(self.py, l).into());
     }
 
     fn decode_dict(&mut self) -> Result<PyObject, PyErr> {
