@@ -6,7 +6,11 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyList};
 use pyo3::{create_exception, PyResult, Python};
 
-create_exception!(bencode_rs,BencodeDecodeError, pyo3::exceptions::PyException);
+create_exception!(
+    bencode_rs,
+    BencodeDecodeError,
+    pyo3::exceptions::PyException
+);
 
 type DecodeError = BencodeDecodeError;
 
@@ -16,8 +20,8 @@ pub fn bdecode<'py>(py: Python<'py>, b: Py<PyAny>) -> PyResult<PyObject> {
     let buf = match b.downcast_bound::<PyBytes>(py) {
         Err(_) => {
             return Err(PyTypeError::new_err("can only decode bytes"));
-        }
-        Ok(b) => b
+        },
+        Ok(b) => b,
     };
 
     if buf.len()? == 0 {
@@ -34,7 +38,6 @@ pub fn bdecode<'py>(py: Python<'py>, b: Py<PyAny>) -> PyResult<PyObject> {
     return Ok(ctx.decode_any()?);
 }
 
-
 struct Decoder<'a> {
     // str_key: bool,
     bytes: &'a [u8],
@@ -50,12 +53,12 @@ impl<'a> Decoder<'a> {
                 let bytes = self.decode_bytes()?;
 
                 return Ok(bytes.into_py(self.py));
-            }
+            },
             b'l' => {
                 let list = self.decode_list()?;
 
                 return Ok(list.into_any());
-            }
+            },
             b'd' => self.decode_dict(),
             _ => return Err(DecodeError::new_err("invalid leading byte")),
         };
@@ -69,7 +72,7 @@ impl<'a> Decoder<'a> {
                     "invalid bytes, missing length separator: index {}",
                     self.index
                 )));
-            }
+            },
         } + self.index;
 
         if self.bytes[self.index] == b'0' && self.index + 1 != index_sep {
@@ -127,12 +130,13 @@ impl<'a> Decoder<'a> {
             b'-' => {
                 if self.bytes[self.index + 1] == b'0' {
                     return Err(DecodeError::new_err(format!(
-                        "invalid int, '-0' found at {}", self.index
+                        "invalid int, '-0' found at {}",
+                        self.index
                     )));
                 }
                 num_start += 1;
                 sign = -1;
-            }
+            },
             b'0' => {
                 if self.index + 1 != index_e {
                     return Err(DecodeError::new_err(format!(
@@ -140,15 +144,16 @@ impl<'a> Decoder<'a> {
                         self.index
                     )));
                 }
-            }
-            _ => {}
+            },
+            _ => {},
         }
 
         for c in self.bytes[num_start..index_e].iter() {
             if !(b'0' <= *c && *c <= b'9') {
-                return Err(DecodeError::new_err(
-                    format!("invalid int, '{}' found at {}", *c as char, self.index)
-                ));
+                return Err(DecodeError::new_err(format!(
+                    "invalid int, '{}' found at {}",
+                    *c as char, self.index
+                )));
             }
         }
 
@@ -161,7 +166,7 @@ impl<'a> Decoder<'a> {
                     Some(v) => v,
                     None => {
                         return self.decode_int_slow(index_e);
-                    }
+                    },
                 }
             }
 
@@ -170,7 +175,7 @@ impl<'a> Decoder<'a> {
                 None => {
                     // slow path to build PyLong with python
                     return self.decode_int_slow(index_e);
-                }
+                },
             };
 
             self.index = index_e + 1;
@@ -185,7 +190,7 @@ impl<'a> Decoder<'a> {
                 Some(v) => v,
                 None => {
                     return self.decode_int_slow(index_e);
-                }
+                },
             }
         }
 
@@ -214,17 +219,18 @@ impl<'a> Decoder<'a> {
         loop {
             match self.bytes.get(self.index) {
                 None => {
-                    return Err(DecodeError::new_err("unexpected end when parsing list".to_string()));
-                }
+                    return Err(DecodeError::new_err(
+                        "unexpected end when parsing list".to_string(),
+                    ));
+                },
                 Some(b'e') => break,
                 Some(_) => {
                     l.push(self.decode_any()?);
-                }
+                },
             }
         }
 
         self.index += 1;
-
 
         Ok(PyList::new_bound(self.py, l).into())
     }
@@ -247,15 +253,21 @@ impl<'a> Decoder<'a> {
                     let ck = Cow::from(key);
                     if let Some(lk) = last_key {
                         if lk > ck {
-                            return Err(DecodeError::new_err(format!("dict key not sorted. index {}", self.index)));
+                            return Err(DecodeError::new_err(format!(
+                                "dict key not sorted. index {}",
+                                self.index
+                            )));
                         } else if lk == ck {
-                            return Err(DecodeError::new_err(format!("duplicated dict key found: index {}", self.index)));
+                            return Err(DecodeError::new_err(format!(
+                                "duplicated dict key found: index {}",
+                                self.index
+                            )));
                         }
                     }
                     d.set_item(ck.clone().into_py(self.py), value.into_py(self.py))?;
                     // map.insert(ck.clone(), value);
                     last_key = Some(ck);
-                }
+                },
             }
         }
 
@@ -267,7 +279,7 @@ impl<'a> Decoder<'a> {
         return match self.bytes.get(self.index) {
             None => {
                 return Err(DecodeError::new_err("index out of range"));
-            }
+            },
             Some(ch) => Ok(*ch),
         };
     }
