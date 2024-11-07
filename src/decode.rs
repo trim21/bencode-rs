@@ -20,7 +20,7 @@ pub fn bdecode(b: &Bound<'_, PyAny>) -> PyResult<PyObject> {
     let buf = match b.downcast::<PyBytes>() {
         Err(_) => {
             return Err(PyTypeError::new_err("can only decode bytes"));
-        }
+        },
         Ok(b) => b,
     };
 
@@ -53,12 +53,12 @@ impl<'a> Decoder<'a> {
                 let bytes = self.decode_bytes()?;
 
                 Ok(bytes.into_py(self.py))
-            }
+            },
             b'l' => {
                 let list = self.decode_list()?;
 
                 Ok(list.into_any())
-            }
+            },
             b'd' => self.decode_dict(),
             _ => Err(DecodeError::new_err("invalid leading byte")),
         }
@@ -72,7 +72,7 @@ impl<'a> Decoder<'a> {
                     "invalid bytes, missing length separator: index {}",
                     self.index
                 )));
-            }
+            },
         } + self.index;
 
         if self.bytes[self.index] == b'0' && self.index + 1 != index_sep {
@@ -136,7 +136,7 @@ impl<'a> Decoder<'a> {
                 }
                 num_start += 1;
                 sign = -1;
-            }
+            },
             b'0' => {
                 if self.index + 1 != index_e {
                     return Err(DecodeError::new_err(format!(
@@ -144,8 +144,8 @@ impl<'a> Decoder<'a> {
                         self.index
                     )));
                 }
-            }
-            _ => {}
+            },
+            _ => {},
         }
 
         for c in &self.bytes[num_start..index_e] {
@@ -162,11 +162,14 @@ impl<'a> Decoder<'a> {
 
             for c_char in &self.bytes[num_start..index_e] {
                 let c = *c_char - b'0';
-                val = match val.checked_mul(10).and_then(|v| v.checked_add(i64::from(c))) {
+                val = match val
+                    .checked_mul(10)
+                    .and_then(|v| v.checked_add(i64::from(c)))
+                {
                     Some(v) => v,
                     None => {
                         return self.decode_int_slow(index_e);
-                    }
+                    },
                 }
             }
 
@@ -175,7 +178,7 @@ impl<'a> Decoder<'a> {
                 None => {
                     // slow path to build PyLong with python
                     return self.decode_int_slow(index_e);
-                }
+                },
             };
 
             self.index = index_e + 1;
@@ -186,11 +189,14 @@ impl<'a> Decoder<'a> {
 
         for c_char in &self.bytes[num_start..index_e] {
             let c = *c_char - b'0';
-            val = match val.checked_mul(10).and_then(|v| v.checked_add(u64::from(c))) {
+            val = match val
+                .checked_mul(10)
+                .and_then(|v| v.checked_add(u64::from(c)))
+            {
                 Some(v) => v,
                 None => {
                     return self.decode_int_slow(index_e);
-                }
+                },
             }
         }
 
@@ -222,11 +228,11 @@ impl<'a> Decoder<'a> {
                     return Err(DecodeError::new_err(
                         "unexpected end when parsing list".to_string(),
                     ));
-                }
+                },
                 Some(b'e') => break,
                 Some(_) => {
                     l.push(self.decode_any()?);
-                }
+                },
             }
         }
 
@@ -269,7 +275,7 @@ impl<'a> Decoder<'a> {
                     d.set_item(ck.clone().into_py(self.py), value.into_py(self.py))?;
                     // map.insert(ck.clone(), value);
                     last_key = Some(ck);
-                }
+                },
             }
         }
 
@@ -281,7 +287,7 @@ impl<'a> Decoder<'a> {
         return match self.bytes.get(self.index) {
             None => {
                 return Err(DecodeError::new_err("index out of range"));
-            }
+            },
             Some(ch) => Ok(*ch),
         };
     }
