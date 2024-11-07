@@ -2,7 +2,12 @@ use bytes::{BufMut, BytesMut};
 use num;
 use once_cell::sync::Lazy;
 use pyo3::exceptions::PyValueError;
-use pyo3::{create_exception, exceptions::PyTypeError, prelude::*, types::{PyBytes, PyDict, PyInt, PyList, PyString, PyTuple}};
+use pyo3::{
+    create_exception,
+    exceptions::PyTypeError,
+    prelude::*,
+    types::{PyBytes, PyDict, PyInt, PyList, PyString, PyTuple},
+};
 use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::collections::HashSet;
@@ -68,9 +73,11 @@ impl Default for Context {
     }
 }
 
-
 impl Context {
-    fn write_int<I: num::Integer + std::fmt::Display>(self: &mut Context, val: I) -> std::io::Result<()> {
+    fn write_int<I: num::Integer + std::fmt::Display>(
+        self: &mut Context,
+        val: I,
+    ) -> std::io::Result<()> {
         std::write!((&mut self.buf).writer(), "{val}")?;
         Ok(())
     }
@@ -191,7 +198,10 @@ fn encode_dict<'py>(ctx: &mut Context, py: Python<'py>, v: &Bound<'py, PyDict>) 
         if let Ok(s) = key.downcast::<PyString>() {
             let b = s.to_str()?;
             unsafe {
-                sv.push((Cow::from(std::mem::transmute::<&[u8], &'py [u8]>(b.as_bytes())), value));
+                sv.push((
+                    Cow::from(std::mem::transmute::<&[u8], &'py [u8]>(b.as_bytes())),
+                    value,
+                ));
             }
             continue;
         }
@@ -201,7 +211,10 @@ fn encode_dict<'py>(ctx: &mut Context, py: Python<'py>, v: &Bound<'py, PyDict>) 
                 // d.as_bytes() return a &[u8] and doesn't live longer than variable `key`,
                 // but it's not ture, &[u8] lives as long as python ptr lives,
                 // which is longer than variable `key` and we do not need to drop it.
-                sv.push((Cow::from(std::mem::transmute::<&[u8], &'py [u8]>(b.as_bytes())), value));
+                sv.push((
+                    Cow::from(std::mem::transmute::<&[u8], &'py [u8]>(b.as_bytes())),
+                    value,
+                ));
             }
             continue;
         }
@@ -220,7 +233,10 @@ fn encode_dict<'py>(ctx: &mut Context, py: Python<'py>, v: &Bound<'py, PyDict>) 
     for (key, _) in sv.clone() {
         if let Some(lk) = last_key {
             if lk == key {
-                return Err(EncodeError::new_err(format!("Duplicated keys {}", String::from_utf8(lk.into())?)));
+                return Err(EncodeError::new_err(format!(
+                    "Duplicated keys {}",
+                    String::from_utf8(lk.into())?
+                )));
             }
         }
 
