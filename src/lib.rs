@@ -1,5 +1,6 @@
 #![allow(clippy::implicit_return)]
 #![deny(clippy::needless_return)]
+#![deny(clippy::pedantic)]
 
 mod decode;
 mod encode;

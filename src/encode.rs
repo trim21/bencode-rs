@@ -23,7 +23,7 @@ pub const MIB: usize = 1_048_576;
 
 #[pyfunction]
 #[pyo3(text_signature = "(v: Any, /)")]
-pub fn bencode<'py>(py: Python<'py>, v: Bound<'py, PyAny>) -> PyResult<Bound<'py, PyBytes>> {
+pub fn bencode<'py>(py: Python<'py>, v: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyBytes>> {
     let mut ctx = get_ctx();
     // let mut ctx = Context::default();
     // let mut ctx = Context::initializer();
@@ -41,18 +41,18 @@ type EncodeError = BencodeEncodeError;
 
 static mut CONTEXT_POOL: Lazy<SyncPool<Context>> = Lazy::new(SyncPool::new);
 
-fn get_ctx() -> Box<Context> {
-    unsafe { CONTEXT_POOL.get() }
+fn get_ctx() -> Context {
+    unsafe { *CONTEXT_POOL.get() }
 }
 
-fn release_ctx(mut ctx: Box<Context>) {
+fn release_ctx(mut ctx: Context) {
     if ctx.buf.capacity() > 100 * MIB {
         return;
     }
     ctx.buf.clear();
     ctx.seen.clear();
     unsafe {
-        CONTEXT_POOL.put(ctx);
+        CONTEXT_POOL.put(Box::from(ctx));
     }
 }
 
@@ -71,19 +71,19 @@ impl Default for Context {
 }
 
 impl Context {
-    fn write_int<I: num::Integer + std::fmt::Display>(
+    fn write_int<Int: num::Integer + std::fmt::Display>(
         self: &mut Context,
-        val: I,
+        val: &Int,
     ) -> std::io::Result<()> {
         std::write!((&mut self.buf).writer(), "{val}")?;
         Ok(())
     }
 }
 
-fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: Bound<'py, PyAny>) -> PyResult<()> {
+fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>) -> PyResult<()> {
     if let Ok(s) = value.downcast::<PyString>() {
         let str = s.to_str()?;
-        ctx.write_int(str.len())?;
+        ctx.write_int(&str.len())?;
         ctx.buf.put_u8(b':');
         ctx.buf.put(str.as_bytes());
 
@@ -93,7 +93,7 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: Bound<'py, PyAny>)
     if let Ok(bytes) = value.downcast::<PyBytes>() {
         let b = bytes.as_bytes();
 
-        ctx.write_int(b.len())?;
+        ctx.write_int(&b.len())?;
         ctx.buf.put_u8(b':');
         ctx.buf.put(b);
 
@@ -104,7 +104,7 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: Bound<'py, PyAny>)
         let v: i128 = int.extract()?;
 
         ctx.buf.put_u8(b'i');
-        ctx.write_int(v)?;
+        ctx.write_int(&v)?;
         ctx.buf.put_u8(b'e');
 
         return Ok(());
@@ -139,7 +139,7 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: Bound<'py, PyAny>)
         ctx.buf.put_u8(b'l');
 
         for x in seq {
-            encode_any(ctx, py, x)?;
+            encode_any(ctx, py, &x)?;
         }
 
         ctx.buf.put_u8(b'e');
@@ -160,7 +160,7 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: Bound<'py, PyAny>)
         ctx.buf.put_u8(b'l');
 
         for x in seq {
-            encode_any(ctx, py, x)?;
+            encode_any(ctx, py, &x)?;
         }
 
         ctx.buf.put_u8(b'e');
@@ -176,8 +176,8 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: Bound<'py, PyAny>)
 }
 
 #[inline]
-fn __encode_str(v: Cow<[u8]>, ctx: &mut Context) -> PyResult<()> {
-    ctx.write_int(v.len())?;
+fn __encode_str(v: &[u8], ctx: &mut Context) -> PyResult<()> {
+    ctx.write_int(&v.len())?;
     ctx.buf.put_u8(b':');
     ctx.buf.put(v.as_ref());
 
@@ -242,8 +242,8 @@ fn encode_dict<'py>(ctx: &mut Context, py: Python<'py>, v: &Bound<'py, PyDict>) 
     }
 
     for (key, value) in sv {
-        __encode_str(key, ctx)?;
-        encode_any(ctx, py, value.into_any())?;
+        __encode_str(&key, ctx)?;
+        encode_any(ctx, py, &value.into_any())?;
     }
 
     ctx.buf.put_u8(b'e');
