@@ -238,7 +238,7 @@ impl<'a> Decoder<'a> {
 
         self.index += 1;
 
-        return Ok(PyList::new(self.py, l)?.unbind().into_any());
+        Ok(PyList::new(self.py, l)?.unbind().into_any())
     }
 
     fn decode_dict(&mut self) -> Result<PyObject, PyErr> {
