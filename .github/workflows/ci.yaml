@@ -115,7 +115,7 @@ jobs:
 
 
   coverage:
-    name: Coverage for ${{ matrix.os }}
+    name: Coverage for ${{ matrix.python-version }}
     strategy:
       matrix:
         os: ["ubuntu"]
