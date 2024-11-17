@@ -112,3 +112,61 @@ jobs:
 
       - run: abi3audit --verbose dist/*.whl
       - run: pipx run twine check --strict dist/*
+
+
+  coverage:
+    name: Coverage for ${{ matrix.python-version }}
+    strategy:
+      matrix:
+        os: ["ubuntu"]
+        python-version:
+          - "3.10"
+          - "3.11"
+          - "3.12"
+          - "3.13"
+
+    runs-on: ${{ matrix.os }}-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "${{ matrix.python-version }}"
+          cache: "pip"
+
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.6
+
+      - name: Set Rust caching env vars only on non-release runs
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+
+      - run: sccache -s
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: llvm-tools
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Setup virtual environment
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          pip install -r requirements.txt
+
+      - name: Run coverage
+        run: |
+          source venv/bin/activate
+          source <(cargo llvm-cov show-env --export-prefix)
+          export CARGO_TARGET_DIR=$CARGO_LLVM_COV_TARGET_DIR
+          cargo llvm-cov clean --workspace
+          maturin develop
+          pytest tests
+          cargo llvm-cov report --lcov --output-path coverage.lcov
+
+      - uses: codecov/codecov-action@v5
+        with:
+          files: coverage.lcov
+          token: '${{ secrets.CODECOV_TOKEN }}'
