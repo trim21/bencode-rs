@@ -136,6 +136,13 @@ jobs:
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.6
 
+      - name: Set Rust caching env vars only on non-release runs
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+
+      - run: sccache -s
+
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: llvm-tools
@@ -152,7 +159,6 @@ jobs:
       - name: Run coverage
         run: |
           source venv/bin/activate
-          export RUSTC_WRAPPER=sccache
           source <(cargo llvm-cov show-env --export-prefix)
           export CARGO_TARGET_DIR=$CARGO_LLVM_COV_TARGET_DIR
           export CARGO_INCREMENTAL=1
