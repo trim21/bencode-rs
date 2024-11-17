@@ -133,32 +133,34 @@ jobs:
           python-version: "${{ matrix.python-version }}"
           cache: "pip"
 
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.6
+
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: llvm-tools
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
-      - uses: Swatinem/rust-cache@v1
-        with:
-          key: coverage-cargo-${{ matrix.os }}
-        continue-on-error: true
+
       - name: Setup virtual environment
         run: |
           python -m venv venv
           source venv/bin/activate
           pip install -r requirements.txt
+
       - name: Run coverage
         run: |
           source venv/bin/activate
+          export RUSTC_WRAPPER=sccache
           source <(cargo llvm-cov show-env --export-prefix)
           export CARGO_TARGET_DIR=$CARGO_LLVM_COV_TARGET_DIR
           export CARGO_INCREMENTAL=1
           cargo llvm-cov clean --workspace
-          cargo test
           maturin develop
           pytest tests
           cargo llvm-cov report --lcov --output-path coverage.lcov
+
       - uses: codecov/codecov-action@v5
         with:
           files: coverage.lcov
