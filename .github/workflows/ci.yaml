@@ -159,7 +159,6 @@ jobs:
       - name: Run coverage
         run: |
           source venv/bin/activate
-          cargo llvm-cov show-env --export-prefix
           source <(cargo llvm-cov show-env --export-prefix)
           export CARGO_TARGET_DIR=$CARGO_LLVM_COV_TARGET_DIR
           cargo llvm-cov clean --workspace
