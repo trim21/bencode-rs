@@ -30,7 +30,7 @@ pub fn bencode<'py>(py: Python<'py>, v: &Bound<'py, PyAny>) -> PyResult<Bound<'p
 
     encode_any(&mut ctx, py, v)?;
 
-    let r = PyBytes::new_bound(py, ctx.buf.as_ref());
+    let r = PyBytes::new(py, ctx.buf.as_ref());
 
     release_ctx(ctx);
 
