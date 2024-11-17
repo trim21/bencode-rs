@@ -162,7 +162,6 @@ jobs:
           cargo llvm-cov show-env --export-prefix
           source <(cargo llvm-cov show-env --export-prefix)
           export CARGO_TARGET_DIR=$CARGO_LLVM_COV_TARGET_DIR
-          export CARGO_INCREMENTAL=1
           cargo llvm-cov clean --workspace
           maturin develop
           pytest tests
