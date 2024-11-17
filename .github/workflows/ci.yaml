@@ -159,7 +159,7 @@ jobs:
           maturin develop
           pytest tests
           cargo llvm-cov report --lcov --output-path coverage.lcov
-      - uses: codecov/codecov-action@v3
+      - uses: codecov/codecov-action@v5
         with:
-          files: coverage.lcov,coverage.xml
-          name: ${{ matrix.os }}
+          files: coverage.lcov
+          token: '${{ secrets.CODECOV_TOKEN }}'
