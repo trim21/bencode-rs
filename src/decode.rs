@@ -52,7 +52,7 @@ impl<'a> Decoder<'a> {
             b'0'..=b'9' => {
                 let bytes = self.decode_bytes()?;
 
-                Ok(bytes.into_py(self.py))
+                Ok(PyBytes::new(self.py, bytes).unbind().into_any())
             }
             b'l' => {
                 let list = self.decode_list()?;
@@ -182,7 +182,7 @@ impl<'a> Decoder<'a> {
             };
 
             self.index = index_e + 1;
-            return Ok(val.into_py(self.py));
+            return Ok(val.into_pyobject(self.py)?.unbind().into_any());
         }
 
         let mut val: u64 = 0;
@@ -201,7 +201,7 @@ impl<'a> Decoder<'a> {
         }
 
         self.index = index_e + 1;
-        Ok(val.into_py(self.py))
+        Ok(val.into_pyobject(self.py)?.unbind().into_any())
     }
 
     // support int may overflow i128/u128
@@ -238,13 +238,13 @@ impl<'a> Decoder<'a> {
 
         self.index += 1;
 
-        return Ok(PyList::new_bound(self.py, l).into());
+        return Ok(PyList::new(self.py, l)?.unbind().into_any());
     }
 
     fn decode_dict(&mut self) -> Result<PyObject, PyErr> {
         self.index += 1;
 
-        let d = PyDict::new_bound(self.py);
+        let d = PyDict::new(self.py);
         let mut last_key: Option<Cow<[u8]>> = None;
         loop {
             match self.bytes.get(self.index) {
@@ -272,7 +272,7 @@ impl<'a> Decoder<'a> {
                             )));
                         }
                     }
-                    d.set_item(ck.clone().into_py(self.py), value.into_py(self.py))?;
+                    d.set_item(ck.clone(), value)?;
                     // map.insert(ck.clone(), value);
                     last_key = Some(ck);
                 }
@@ -280,7 +280,7 @@ impl<'a> Decoder<'a> {
         }
 
         self.index += 1;
-        Ok(d.into_py(self.py))
+        Ok(d.into())
     }
 
     fn current_byte(&self) -> Result<u8, PyErr> {
