@@ -112,3 +112,54 @@ jobs:
 
       - run: abi3audit --verbose dist/*.whl
       - run: pipx run twine check --strict dist/*
+
+
+  coverage:
+    name: Coverage for ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: ["ubuntu"]
+        python-version:
+          - "3.10"
+          - "3.11"
+          - "3.12"
+          - "3.13"
+
+    runs-on: ${{ matrix.os }}-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: "${{ matrix.python-version }}"
+          cache: "pip"
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: llvm-cov
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      - uses: Swatinem/rust-cache@v1
+        with:
+          key: coverage-cargo-${{ matrix.os }}
+        continue-on-error: true
+      - name: Setup virtual environment
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          pip install -r requirements.txt
+      - name: Run coverage
+        run: |
+          source venv/bin/activate
+          source <(cargo llvm-cov show-env --export-prefix)
+          export CARGO_TARGET_DIR=$CARGO_LLVM_COV_TARGET_DIR
+          export CARGO_INCREMENTAL=1
+          cargo llvm-cov clean --workspace
+          cargo test
+          maturin develop
+          pytest tests --cov=foobar --cov-report xml
+          cargo llvm-cov --no-run --lcov --output-path coverage.lcov
+      - uses: codecov/codecov-action@v3
+        with:
+          files: coverage.lcov,coverage.xml
+          name: ${{ matrix.os }}
