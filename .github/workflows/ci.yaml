@@ -157,7 +157,7 @@ jobs:
           cargo llvm-cov clean --workspace
           cargo test
           maturin develop
-          pytest tests --cov=foobar --cov-report xml
+          pytest tests
           cargo llvm-cov --no-run --lcov --output-path coverage.lcov
       - uses: codecov/codecov-action@v3
         with:
