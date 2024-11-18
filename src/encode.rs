@@ -1,6 +1,7 @@
 use bytes::{BufMut, BytesMut};
 use once_cell::sync::Lazy;
 use pyo3::exceptions::PyValueError;
+use pyo3::PyTypeCheck;
 use pyo3::{
     create_exception,
     exceptions::PyTypeError,
@@ -51,6 +52,7 @@ fn release_ctx(mut ctx: Context) {
     }
     ctx.buf.clear();
     ctx.seen.clear();
+    ctx.stack_depth = 0;
     unsafe {
         CONTEXT_POOL.put(Box::from(ctx));
     }
@@ -59,6 +61,7 @@ fn release_ctx(mut ctx: Context) {
 struct Context {
     buf: BytesMut,
     seen: HashSet<usize>,
+    stack_depth: usize,
 }
 
 impl Default for Context {
@@ -66,6 +69,7 @@ impl Default for Context {
         Self {
             buf: BytesMut::with_capacity(4096),
             seen: HashSet::with_capacity(100),
+            stack_depth: 0,
         }
     }
 }
@@ -73,7 +77,7 @@ impl Default for Context {
 impl Context {
     fn write_int<Int: num::Integer + std::fmt::Display>(
         self: &mut Context,
-        val: &Int,
+        val: Int,
     ) -> std::io::Result<()> {
         std::write!((&mut self.buf).writer(), "{val}")?;
         Ok(())
@@ -81,49 +85,66 @@ impl Context {
 }
 
 fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>) -> PyResult<()> {
-    if let Ok(s) = value.downcast::<PyString>() {
-        let str = s.to_str()?;
-        ctx.write_int(&str.len())?;
+    if PyString::type_check(value) {
+        let s = unsafe { value.downcast_unchecked::<PyString>() };
+        let b = s.to_str()?;
+        ctx.write_int(b.len())?;
         ctx.buf.put_u8(b':');
-        ctx.buf.put(str.as_bytes());
-
+        ctx.buf.put(b.as_bytes());
         return Ok(());
     }
 
-    if let Ok(bytes) = value.downcast::<PyBytes>() {
+    if PyBytes::type_check(value) {
+        let bytes = unsafe { value.downcast_unchecked::<PyBytes>() };
+
         let b = bytes.as_bytes();
 
-        ctx.write_int(&b.len())?;
+        ctx.write_int(b.len())?;
         ctx.buf.put_u8(b':');
         ctx.buf.put(b);
 
         return Ok(());
     }
 
-    if let Ok(int) = value.downcast::<PyInt>() {
-        let v: i128 = int.extract()?;
+    if PyInt::type_check(value) {
+        let v = unsafe { value.downcast_unchecked::<PyInt>() };
 
-        ctx.buf.put_u8(b'i');
-        ctx.write_int(&v)?;
-        ctx.buf.put_u8(b'e');
+        match v.extract::<i64>() {
+            Ok(v) => {
+                ctx.buf.put_u8(b'i');
+                ctx.write_int(v)?;
+                ctx.buf.put_u8(b'e');
 
-        return Ok(());
+                return Ok(());
+            }
+            Err(_) => todo!(),
+        }
     }
 
     let ptr = value.as_ptr().cast::<()>() as usize;
 
-    if let Ok(dict) = value.downcast::<PyDict>() {
-        if ctx.seen.contains(&ptr) {
-            let repr = value.repr()?.to_string();
-            return Err(PyValueError::new_err(format!(
-                "circular reference found: {repr}"
-            )));
+    if PyDict::type_check(value) {
+        ctx.stack_depth += 1;
+        let checked = ctx.stack_depth >= 1000;
+
+        if checked {
+            if ctx.seen.contains(&ptr) {
+                let repr = value.repr()?.to_string();
+                return Err(PyValueError::new_err(format!(
+                    "circular reference found: {repr}"
+                )));
+            }
+            ctx.seen.insert(ptr);
         }
-        ctx.seen.insert(ptr);
 
-        encode_dict(ctx, py, dict)?;
+        unsafe {
+            encode_dict(ctx, py, value.downcast_unchecked())?;
+        }
 
-        ctx.seen.remove(&ptr);
+        if checked {
+            ctx.seen.remove(&ptr);
+        }
+
         return Ok(());
     }
 
@@ -177,7 +198,7 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
 
 #[inline]
 fn __encode_str(v: &[u8], ctx: &mut Context) -> PyResult<()> {
-    ctx.write_int(&v.len())?;
+    ctx.write_int(v.len())?;
     ctx.buf.put_u8(b':');
     ctx.buf.put(v.as_ref());
 
@@ -190,14 +211,14 @@ fn encode_dict<'py>(ctx: &mut Context, py: Python<'py>, v: &Bound<'py, PyDict>) 
     #[allow(clippy::type_complexity)]
     let mut sv: SmallVec<[(Cow<[u8]>, Bound<'_, PyAny>); 8]> = SmallVec::with_capacity(v.len());
 
-    for item in v.items().iter() {
-        let (key, value): (Bound<'py, PyAny>, Bound<'_, PyAny>) = item.extract()?;
-
-        if let Ok(s) = key.downcast::<PyString>() {
-            let b = s.to_str()?;
+    for (key, value) in v.iter() {
+        if let Ok(s) = key.extract::<&str>() {
             unsafe {
+                // d.as_bytes() return a &[u8] and doesn't live longer than variable `key`,
+                // but it's not true, &[u8] lives as long as python ptr lives,
+                // which is longer than variable `key` and we do not need to drop it.
                 sv.push((
-                    Cow::from(std::mem::transmute::<&[u8], &'py [u8]>(b.as_bytes())),
+                    Cow::from(std::mem::transmute::<&[u8], &'py [u8]>(s.as_bytes())),
                     value,
                 ));
             }
@@ -207,7 +228,7 @@ fn encode_dict<'py>(ctx: &mut Context, py: Python<'py>, v: &Bound<'py, PyDict>) 
         if let Ok(b) = key.downcast::<PyBytes>() {
             unsafe {
                 // d.as_bytes() return a &[u8] and doesn't live longer than variable `key`,
-                // but it's not ture, &[u8] lives as long as python ptr lives,
+                // but it's not true, &[u8] lives as long as python ptr lives,
                 // which is longer than variable `key` and we do not need to drop it.
                 sv.push((
                     Cow::from(std::mem::transmute::<&[u8], &'py [u8]>(b.as_bytes())),
