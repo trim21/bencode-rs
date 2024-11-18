@@ -149,43 +149,63 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
     }
 
     if PyList::type_check(value) {
-        if ctx.seen.contains(&ptr) {
-            let repr = value.repr()?.to_string();
-            return Err(PyValueError::new_err(format!(
-                "circular reference found {repr}"
-            )));
+        ctx.stack_depth += 1;
+        let checked = ctx.stack_depth >= 1000;
+
+        if checked {
+            if ctx.seen.contains(&ptr) {
+                let repr = value.repr()?.to_string();
+                return Err(PyValueError::new_err(format!(
+                    "circular reference found: {repr}"
+                )));
+            }
+            ctx.seen.insert(ptr);
         }
 
-        ctx.seen.insert(ptr);
         ctx.buf.put_u8(b'l');
 
-        for x in value::downcast_unchecked::<PyList>() {
+        let seq = unsafe { value.downcast_unchecked::<PyList>() };
+
+        for x in seq.iter() {
             encode_any(ctx, py, &x)?;
         }
 
         ctx.buf.put_u8(b'e');
-        ctx.seen.remove(&ptr);
+
+        if checked {
+            ctx.seen.remove(&ptr);
+        }
 
         return Ok(());
     }
 
-    if let Ok(seq) = value.downcast::<PyTuple>() {
-        if ctx.seen.contains(&ptr) {
-            let repr = value.repr()?.to_string();
-            return Err(PyValueError::new_err(format!(
-                "circular reference found {repr}"
-            )));
+    if PyTuple::type_check(value) {
+        ctx.stack_depth += 1;
+        let checked = ctx.stack_depth >= 1000;
+
+        if checked {
+            if ctx.seen.contains(&ptr) {
+                let repr = value.repr()?.to_string();
+                return Err(PyValueError::new_err(format!(
+                    "circular reference found: {repr}"
+                )));
+            }
+            ctx.seen.insert(ptr);
         }
 
-        ctx.seen.insert(ptr);
         ctx.buf.put_u8(b'l');
 
-        for x in seq {
+        let seq = unsafe { value.downcast_unchecked::<PyTuple>() };
+
+        for x in seq.iter() {
             encode_any(ctx, py, &x)?;
         }
 
         ctx.buf.put_u8(b'e');
-        ctx.seen.remove(&ptr);
+
+        if checked {
+            ctx.seen.remove(&ptr);
+        }
 
         return Ok(());
     }
