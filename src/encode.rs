@@ -26,8 +26,6 @@ pub const MIB: usize = 1_048_576;
 #[pyo3(text_signature = "(v: Any, /)")]
 pub fn bencode<'py>(py: Python<'py>, v: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyBytes>> {
     let mut ctx = get_ctx();
-    // let mut ctx = Context::default();
-    // let mut ctx = Context::initializer();
 
     encode_any(&mut ctx, py, v)?;
 
