@@ -12,6 +12,7 @@ use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::io::Write;
+use std::ptr::null_mut;
 use syncpool::SyncPool;
 
 create_exception!(
@@ -212,6 +213,18 @@ fn __encode_str(v: &[u8], ctx: &mut Context) -> PyResult<()> {
     Ok(())
 }
 
+struct AutoFree {
+    pub ptr: *mut ffi::PyObject,
+}
+
+impl Drop for AutoFree {
+    fn drop(&mut self) {
+        unsafe {
+            ffi::Py_DecRef(self.ptr);
+        }
+    }
+}
+
 fn encode_int<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>) -> PyResult<()> {
     let v = unsafe { value.downcast_unchecked::<PyInt>() };
 
@@ -226,9 +239,19 @@ fn encode_int<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
     ctx.buf.put_u8(b'i');
 
     unsafe {
-        let o = ffi::PyNumber_Long(value.as_ptr());
-        let s = ffi::PyObject_Str(o);
+        let i = ffi::PyNumber_Long(value.as_ptr());
+        if i == null_mut() {
+            return Err(PyErr::fetch(py));
+        }
+
+        let o = AutoFree { ptr: i };
+        let s = ffi::PyObject_Str(o.ptr);
+        if s == null_mut() {
+            return Err(PyErr::fetch(py));
+        }
+
         let ss = PyObject::from_owned_ptr(py, s);
+
         let s = ss.downcast_bound_unchecked::<PyString>(py);
         ctx.buf.put(s.to_str()?.as_bytes());
     };
