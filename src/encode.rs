@@ -1,13 +1,14 @@
 use bytes::{BufMut, BytesMut};
 use once_cell::sync::Lazy;
 use pyo3::exceptions::PyValueError;
-use pyo3::PyTypeCheck;
+use pyo3::ffi::PyNumber_Long;
 use pyo3::{
     create_exception,
     exceptions::PyTypeError,
     prelude::*,
     types::{PyBytes, PyDict, PyInt, PyList, PyString, PyTuple},
 };
+use pyo3::{ffi, PyTypeCheck};
 use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::collections::HashSet;
@@ -115,7 +116,18 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
 
                 return Ok(());
             }
-            Err(_) => todo!(),
+            Err(_) => {
+                ctx.buf.put_u8(b'i');
+
+                // unsafe {
+                // let o = ffi::PyNumber_Long(value.as_ptr());
+                // let s = ffi::PyObject_Str(o);
+                // }
+
+                ctx.buf.put_u8(b'e');
+
+                return Ok(());
+            }
         }
     }
 
