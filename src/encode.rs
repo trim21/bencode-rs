@@ -1,7 +1,6 @@
 use bytes::{BufMut, BytesMut};
 use once_cell::sync::Lazy;
 use pyo3::exceptions::PyValueError;
-use pyo3::ffi::PyNumber_Long;
 use pyo3::{
     create_exception,
     exceptions::PyTypeError,
@@ -119,10 +118,13 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
             Err(_) => {
                 ctx.buf.put_u8(b'i');
 
-                // unsafe {
-                // let o = ffi::PyNumber_Long(value.as_ptr());
-                // let s = ffi::PyObject_Str(o);
-                // }
+                unsafe {
+                    let o = ffi::PyNumber_Long(value.as_ptr());
+                    let s = ffi::PyObject_Str(o);
+                    let ss = PyObject::from_owned_ptr(py, s);
+                    let s = ss.downcast_bound_unchecked::<PyString>(py);
+                    ctx.buf.put(s.to_str()?.as_bytes());
+                };
 
                 ctx.buf.put_u8(b'e');
 
