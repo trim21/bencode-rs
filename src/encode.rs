@@ -148,7 +148,7 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
         return Ok(());
     }
 
-    if let Ok(seq) = value.downcast::<PyList>() {
+    if PyList::type_check(value) {
         if ctx.seen.contains(&ptr) {
             let repr = value.repr()?.to_string();
             return Err(PyValueError::new_err(format!(
@@ -159,7 +159,7 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
         ctx.seen.insert(ptr);
         ctx.buf.put_u8(b'l');
 
-        for x in seq {
+        for x in value::downcast_unchecked::<PyList>() {
             encode_any(ctx, py, &x)?;
         }
 
