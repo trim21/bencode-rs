@@ -22,11 +22,11 @@ single_file_torrent = (
 )
 
 
-s = {key.encode(): value for key, value in compat_peers_py.items()}
-
-
 def test_benchmark_encode_compat_peers_bytes_key(benchmark):
-    benchmark(bencode2.bencode, s)
+    benchmark(
+        bencode2.bencode,
+        {key.encode(): value for key, value in compat_peers_py.items()},
+    )
 
 
 def test_benchmark_encode_compat_peers_str_key(benchmark):
