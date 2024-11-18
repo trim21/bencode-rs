@@ -73,7 +73,7 @@ impl Default for Context {
 }
 
 impl Context {
-    fn write_int<Int: num::Integer + std::fmt::Display>(
+    fn write_int<Int: num::Integer + std::fmt::Display + Copy>(
         self: &mut Context,
         val: Int,
     ) -> std::io::Result<()> {
