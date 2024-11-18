@@ -12,7 +12,6 @@ use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::io::Write;
-use std::ptr::null_mut;
 use syncpool::SyncPool;
 
 create_exception!(
@@ -240,13 +239,13 @@ fn encode_int<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
 
     unsafe {
         let i = ffi::PyNumber_Long(value.as_ptr());
-        if i == null_mut() {
+        if i.is_null() {
             return Err(PyErr::fetch(py));
         }
 
         let o = AutoFree { ptr: i };
         let s = ffi::PyObject_Str(o.ptr);
-        if s == null_mut() {
+        if s.is_null() {
             return Err(PyErr::fetch(py));
         }
 
