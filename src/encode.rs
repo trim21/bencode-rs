@@ -220,7 +220,7 @@ fn encode_int<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
         ctx.write_int(v)?;
         ctx.buf.put_u8(b'e');
 
-        Ok(())
+        return Ok(());
     }
 
     ctx.buf.put_u8(b'i');
