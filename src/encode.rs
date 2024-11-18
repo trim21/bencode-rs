@@ -105,32 +105,7 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
     }
 
     if PyInt::type_check(value) {
-        let v = unsafe { value.downcast_unchecked::<PyInt>() };
-
-        match v.extract::<i64>() {
-            Ok(v) => {
-                ctx.buf.put_u8(b'i');
-                ctx.write_int(v)?;
-                ctx.buf.put_u8(b'e');
-
-                return Ok(());
-            }
-            Err(_) => {
-                ctx.buf.put_u8(b'i');
-
-                unsafe {
-                    let o = ffi::PyNumber_Long(value.as_ptr());
-                    let s = ffi::PyObject_Str(o);
-                    let ss = PyObject::from_owned_ptr(py, s);
-                    let s = ss.downcast_bound_unchecked::<PyString>(py);
-                    ctx.buf.put(s.to_str()?.as_bytes());
-                };
-
-                ctx.buf.put_u8(b'e');
-
-                return Ok(());
-            }
-        }
+        return encode_int(ctx, py, value);
     }
 
     let ptr = value.as_ptr().cast::<()>() as usize;
@@ -233,6 +208,32 @@ fn __encode_str(v: &[u8], ctx: &mut Context) -> PyResult<()> {
     ctx.write_int(v.len())?;
     ctx.buf.put_u8(b':');
     ctx.buf.put(v.as_ref());
+
+    Ok(())
+}
+
+fn encode_int<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>) -> PyResult<()> {
+    let v = unsafe { value.downcast_unchecked::<PyInt>() };
+
+    if let Ok(v) = v.extract::<i64>() {
+        ctx.buf.put_u8(b'i');
+        ctx.write_int(v)?;
+        ctx.buf.put_u8(b'e');
+
+        Ok(())
+    }
+
+    ctx.buf.put_u8(b'i');
+
+    unsafe {
+        let o = ffi::PyNumber_Long(value.as_ptr());
+        let s = ffi::PyObject_Str(o);
+        let ss = PyObject::from_owned_ptr(py, s);
+        let s = ss.downcast_bound_unchecked::<PyString>(py);
+        ctx.buf.put(s.to_str()?.as_bytes());
+    };
+
+    ctx.buf.put_u8(b'e');
 
     Ok(())
 }
