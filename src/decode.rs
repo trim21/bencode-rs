@@ -284,11 +284,9 @@ impl<'a> Decoder<'a> {
     }
 
     fn current_byte(&self) -> Result<u8, PyErr> {
-        return match self.bytes.get(self.index) {
-            None => {
-                return Err(DecodeError::new_err("index out of range"));
-            }
+        match self.bytes.get(self.index) {
+            None => Err(DecodeError::new_err("index out of range")),
             Some(ch) => Ok(*ch),
-        };
+        }
     }
 }
