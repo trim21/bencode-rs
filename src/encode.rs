@@ -42,7 +42,9 @@ static mut CONTEXT_POOL: Lazy<SyncPool<Context>> = Lazy::new(SyncPool::new);
 
 fn get_ctx() -> Context {
     #[allow(static_mut_refs)]
-    unsafe { *CONTEXT_POOL.get() }
+    unsafe {
+        *CONTEXT_POOL.get()
+    }
 }
 
 fn release_ctx(mut ctx: Context) {
