@@ -41,6 +41,7 @@ type EncodeError = BencodeEncodeError;
 static mut CONTEXT_POOL: Lazy<SyncPool<Context>> = Lazy::new(SyncPool::new);
 
 fn get_ctx() -> Context {
+    #[allow(static_mut_refs)]
     unsafe { *CONTEXT_POOL.get() }
 }
 
@@ -52,6 +53,7 @@ fn release_ctx(mut ctx: Context) {
     ctx.seen.clear();
     ctx.stack_depth = 0;
     unsafe {
+        #[allow(static_mut_refs)]
         CONTEXT_POOL.put(Box::from(ctx));
     }
 }
