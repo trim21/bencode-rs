@@ -19,7 +19,7 @@ jobs:
     uses: ./.github/workflows/_build_wheels.yaml
 
   cargo-fmt:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -31,7 +31,7 @@ jobs:
   test:
     strategy:
       matrix:
-        os: ["ubuntu-latest", "macos-13", "macos-14", "windows-latest"]
+        os: ["ubuntu-24.04", "macos-13", "macos-14", "windows-latest"]
         python-version:
           - "3.10"
           - "3.11"
@@ -94,7 +94,7 @@ jobs:
   audit:
     name: Audit
     needs: [build]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -118,30 +118,19 @@ jobs:
     name: Coverage for ${{ matrix.python-version }}
     strategy:
       matrix:
-        os: ["ubuntu"]
         python-version:
           - "3.10"
           - "3.11"
           - "3.12"
           - "3.13"
 
-    runs-on: ${{ matrix.os }}-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "${{ matrix.python-version }}"
           cache: "pip"
-
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.6
-
-      - name: Set Rust caching env vars only on non-release runs
-        run: |
-          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-
-      - run: sccache -s
 
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -150,20 +139,18 @@ jobs:
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
 
-      - name: Setup virtual environment
-        run: |
-          python -m venv venv
-          source venv/bin/activate
-          pip install -r requirements.txt
+      - run: pip install -r requirements.txt
 
       - name: Run coverage
         run: |
-          source venv/bin/activate
+          set -euxo pipefail
           source <(cargo llvm-cov show-env --export-prefix)
           export CARGO_TARGET_DIR=$CARGO_LLVM_COV_TARGET_DIR
           cargo llvm-cov clean --workspace
-          maturin develop
-          pytest tests
+          cargo build
+          ls target/debug -ahl
+          cp target/debug/libbencode.so py/bencode_rs/_bencode.so
+          PYTHONPATH=py pytest tests
           cargo llvm-cov report --lcov --output-path coverage.lcov
 
       - uses: codecov/codecov-action@v5
