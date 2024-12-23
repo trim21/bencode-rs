@@ -1,4 +1,4 @@
-use bytes::{BufMut, BytesMut};
+use bytes::BufMut;
 use once_cell::sync::Lazy;
 use pyo3::exceptions::PyValueError;
 use pyo3::{
@@ -27,13 +27,19 @@ pub const MIB: usize = 1_048_576;
 pub fn bencode<'py>(py: Python<'py>, v: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyBytes>> {
     let mut ctx = get_ctx();
 
-    encode_any(&mut ctx, py, v)?;
+    let result = encode_any(&mut ctx, py, v);
 
-    let r = PyBytes::new(py, ctx.buf.as_ref());
-
-    release_ctx(ctx);
-
-    Ok(r)
+    return match result {
+        Ok(_) => {
+            let rr = PyBytes::new(py, ctx.buf.as_ref());
+            release_ctx(ctx);
+            Ok(rr)
+        }
+        Err(err) => {
+            release_ctx(ctx);
+            Err(err)
+        }
+    };
 }
 
 type EncodeError = BencodeEncodeError;
@@ -61,7 +67,7 @@ fn release_ctx(mut ctx: Context) {
 }
 
 struct Context {
-    buf: BytesMut,
+    buf: Vec<u8>,
     seen: HashSet<usize>,
     stack_depth: usize,
 }
@@ -69,7 +75,7 @@ struct Context {
 impl Default for Context {
     fn default() -> Self {
         Self {
-            buf: BytesMut::with_capacity(4096),
+            buf: Vec::with_capacity(4096),
             seen: HashSet::with_capacity(100),
             stack_depth: 0,
         }
@@ -81,7 +87,7 @@ impl Context {
         self: &mut Context,
         val: Int,
     ) -> std::io::Result<()> {
-        std::write!((&mut self.buf).writer(), "{val}")?;
+        std::write!(&mut self.buf, "{val}")?;
         Ok(())
     }
 }
@@ -116,7 +122,7 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
 
     if PyDict::type_check(value) {
         ctx.stack_depth += 1;
-        let checked = ctx.stack_depth >= 1000;
+        let checked = ctx.stack_depth >= 100;
 
         if checked {
             if ctx.seen.contains(&ptr) {
@@ -141,7 +147,7 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
 
     if PyList::type_check(value) {
         ctx.stack_depth += 1;
-        let checked = ctx.stack_depth >= 1000;
+        let checked = ctx.stack_depth >= 100;
 
         if checked {
             if ctx.seen.contains(&ptr) {
@@ -172,7 +178,7 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
 
     if PyTuple::type_check(value) {
         ctx.stack_depth += 1;
-        let checked = ctx.stack_depth >= 1000;
+        let checked = ctx.stack_depth >= 100;
 
         if checked {
             if ctx.seen.contains(&ptr) {
