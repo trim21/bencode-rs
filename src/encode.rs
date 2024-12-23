@@ -20,7 +20,7 @@ create_exception!(
     pyo3::exceptions::PyException
 );
 
-pub const MIB: usize = 1_048_576;
+pub const MIB: usize = 1024 * 1024;
 
 #[pyfunction]
 #[pyo3(text_signature = "(v: Any, /)")]
@@ -54,7 +54,7 @@ fn get_ctx() -> Context {
 }
 
 fn release_ctx(mut ctx: Context) {
-    if ctx.buf.capacity() > 100 * MIB {
+    if ctx.buf.capacity() > MIB {
         return;
     }
     ctx.buf.clear();
