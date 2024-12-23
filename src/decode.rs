@@ -24,7 +24,9 @@ pub fn bdecode(b: &Bound<'_, PyAny>) -> PyResult<PyObject> {
         Ok(b) => b,
     };
 
-    if buf.len()? == 0 {
+    let size = buf.len()?;
+
+    if size == 0 {
         return Err(DecodeError::new_err("empty bytes"));
     }
 
@@ -32,10 +34,20 @@ pub fn bdecode(b: &Bound<'_, PyAny>) -> PyResult<PyObject> {
         bytes: buf.as_bytes(),
         index: 0,
         py: b.py(),
-        // depth: 0,
     };
 
-    ctx.decode_any()
+    match ctx.decode_any() {
+        Ok(object) => {
+            if ctx.index != size {
+                return Err(DecodeError::new_err(format!(
+                    "invalid bencode data, top level value end at index {} but total bytes length {}",
+                    ctx.index+1, size
+                )));
+            }
+            Ok(object)
+        }
+        Err(err) => Err(err),
+    }
 }
 
 struct Decoder<'a> {
@@ -84,13 +96,19 @@ impl<'a> Decoder<'a> {
 
         let mut len: usize = 0;
         for c in &self.bytes[self.index..index_sep] {
+            if *c < b'0' || *c > b'9' {
+                return Err(DecodeError::new_err(format!(
+                    "invalid bytes length, found {} at index {}",
+                    c, self.index
+                )));
+            }
             len = len * 10 + (c - b'0') as usize;
         }
 
         let bytes_start: usize = index_sep + 1;
         let bytes_end: usize = bytes_start + len - 1;
 
-        if bytes_end > self.bytes.len() - 1 {
+        if bytes_end >= self.bytes.len() {
             return Err(DecodeError::new_err(format!(
                 "invalid bytes length, buffer overflow to {}: index {}, len {}",
                 bytes_end, self.index, len

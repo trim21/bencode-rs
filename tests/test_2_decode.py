@@ -14,63 +14,36 @@ def test_non_bytes_input():
 
 
 @pytest.mark.parametrize(
-    ["raw", "expected"],
-    [
-        (b"i0e", 0),
-        (b"i1e", 1),
-        (b"i-123e", -123),
-        (b"i20022e", 20022),
-        (b"i-20022e", -20022),
-    ],
-)
-def test_decode_int(raw, expected):
-    assert bdecode(raw) == expected
-
-
-@pytest.mark.parametrize(
     "raw",
     [
+        b"",
+        b"1",
+        b"1:",
+        b"1a:",
+        b"1 :",
         b"i-0e",
-        b"i-01e",
         b"i01e",
-        b"i01",
+        b"iae",
+        b"i.e",
         b"ie",
-        b"i",
-    ],
-)
-def test_decode_int_throw(raw):
-    with pytest.raises(BencodeDecodeError):
-        bdecode(raw)
-
-
-def test_decode_str():
-    r = bytes.fromhex("0868de397935c05398eee852b7cf76a5b9801f90")
-    assert len(r) == 20
-    assert bdecode(b"20:" + r) == r
-
-    with pytest.raises(BencodeDecodeError):
-        bdecode(b"1:")
-    with pytest.raises(BencodeDecodeError):
-        bdecode(b"2:")
-
-    assert bdecode(b"0:") == b""
-
-
-@pytest.mark.parametrize(
-    "raw",
-    [
-        b"i123",  # invalid int
-        b"i-0e",
-        b"i01e",
+        b"i-ae",
+        b"iae",
         b"iabce",
         b"1a2:qwer",  # invalid str length
+        b"i123",  # invalid int
         b"01:q",  # invalid str length
         b"10:q",  # str length too big
         b"a",
-        b"l",
-        b"lll",
         # directory keys not sorted for {'foo': 1, 'spam': 2}
+        b"di1ei2ee",
         b"d3:foo4:spam3:bari42ee",
+        b"d4:spaml1:a1:be",
+        b"d3:keyi1e3:keyi2ee",  # duplicated keys
+        b"d-3:keyi1e3:keai2ee",  # duplicated keys
+        b"di1ei1e3:keai2ee",  # duplicated keys
+        b"l",
+        b"lee",
+        b"dee",
     ],
 )
 def test_bad_case(raw: bytes):
@@ -81,30 +54,25 @@ def test_bad_case(raw: bytes):
 @pytest.mark.parametrize(
     ["raw", "expected"],
     [
-        (b"le", []),
-        (b"llee", [[]]),
-        (b"lli1eelee", [[1], []]),
-    ],
-)
-def test_list(raw: bytes, expected: Any):
-    assert bdecode(raw) == expected
-
-
-@pytest.mark.parametrize(
-    ["raw", "expected"],
-    [
-        (b"i1e", 1),
-        (b"i4927586304e", 4927586304),
+        # (memoryview(b"0:"), b""),
+        # (bytearray(b"0:"), b""),
         (b"0:", b""),
         (b"4:spam", b"spam"),
         (b"i-3e", -3),
-        (b"i-9223372036854775808e", -9223372036854775808),  # longlong int +1
+        (b"i49e", 49),
+        (b"i4927586304e", 4927586304),
+        (b"i9223372036854775806e", 9223372036854775806),
+        (b"i9223372036854775807e", 9223372036854775807),
+        (b"i9223372036854775808e", 9223372036854775808),
+        (b"i-9223372036854775807e", -9223372036854775807),
+        (b"i-9223372036854775808e", -9223372036854775808),
+        (b"i-9223372036854775809e", -9223372036854775809),
         (b"i9223372036854775808e", 9223372036854775808),  # longlong int +1
         (b"i18446744073709551616e", 18446744073709551616),  # unsigned long long +1
-        # long long int range -9223372036854775808, 9223372036854775807
         (b"i-9223372036854775808e", -9223372036854775808),
-        (b"i9223372036854775808e", 9223372036854775808),
+        (b"i-18446744073709551616e", -18446744073709551616),
         (b"le", []),
+        (b"de", {}),
         (b"l4:spam4:eggse", [b"spam", b"eggs"]),
         # (b"de", {}),
         (b"d3:cow3:moo4:spam4:eggse", {b"cow": b"moo", b"spam": b"eggs"}),
@@ -123,16 +91,3 @@ def test_decode1():
         b"t": b"aa",
         b"y": b"q",
     }
-
-
-#
-#
-# @pytest.mark.parametrize(
-#     ["raw", "expected"],
-#     [
-#         (b"d3:cow3:moo4:spam4:eggse", {"cow": b"moo", "spam": b"eggs"}),
-#         (b"d4:spaml1:a1:bee", {"spam": [b"a", b"b"]}),
-#     ],
-# )
-# def test_dict_str_key(raw: bytes, expected: Any):
-#     assert bdecode(raw, str_key=True) == expected

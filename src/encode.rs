@@ -1,6 +1,6 @@
 use bytes::BufMut;
 use once_cell::sync::Lazy;
-use pyo3::exceptions::PyValueError;
+use pyo3::types::PyByteArray;
 use pyo3::{
     create_exception,
     exceptions::PyTypeError,
@@ -127,7 +127,7 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
         if checked {
             if ctx.seen.contains(&ptr) {
                 let repr = value.repr()?.to_string();
-                return Err(PyValueError::new_err(format!(
+                return Err(BencodeEncodeError::new_err(format!(
                     "circular reference found: {repr}"
                 )));
             }
@@ -152,7 +152,7 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
         if checked {
             if ctx.seen.contains(&ptr) {
                 let repr = value.repr()?.to_string();
-                return Err(PyValueError::new_err(format!(
+                return Err(BencodeEncodeError::new_err(format!(
                     "circular reference found: {repr}"
                 )));
             }
@@ -183,7 +183,7 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
         if checked {
             if ctx.seen.contains(&ptr) {
                 let repr = value.repr()?.to_string();
-                return Err(PyValueError::new_err(format!(
+                return Err(BencodeEncodeError::new_err(format!(
                     "circular reference found: {repr}"
                 )));
             }
@@ -203,6 +203,18 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
         if checked {
             ctx.seen.remove(&ptr);
         }
+
+        return Ok(());
+    }
+
+    if PyByteArray::type_check(value) {
+        let bytes = unsafe { value.downcast_unchecked::<PyByteArray>() };
+
+        let b = unsafe { bytes.as_bytes() };
+
+        ctx.write_int(b.len())?;
+        ctx.buf.put_u8(b':');
+        ctx.buf.put(b);
 
         return Ok(());
     }
