@@ -1,4 +1,4 @@
-exclude: '^.*\.bin$'
+exclude: '^.*\.(bin|torrent)$'
 
 repos:
   - repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks

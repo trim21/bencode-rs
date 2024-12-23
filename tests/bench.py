@@ -1,4 +1,3 @@
-import dataclasses
 import sys
 from pathlib import Path
 
@@ -17,6 +16,14 @@ compat_peers_py = {
 single_file_torrent = (
     Path(__file__)
     .joinpath("../fixtures/ubuntu-22.04.2-desktop-amd64.iso.torrent.bin")
+    .resolve()
+    .read_bytes()
+)
+
+
+multiple_files_torrent = (
+    Path(__file__)
+    .joinpath("../fixtures/multiple-files.torrent.bin")
     .resolve()
     .read_bytes()
 )
@@ -43,3 +50,11 @@ def test_benchmark_decode_single_file_torrent(benchmark):
 
 def test_benchmark_encode_single_file_torrent(benchmark):
     benchmark(bencode2.bencode, bencode2.bdecode(single_file_torrent))
+
+
+def test_benchmark_encode_multiple_files_torrent(benchmark):
+    benchmark(bencode2.bencode, bencode2.bencode(multiple_files_torrent))
+
+
+def test_benchmark_decode_multiple_files_torrent(benchmark):
+    benchmark(bencode2.bdecode, multiple_files_torrent)
