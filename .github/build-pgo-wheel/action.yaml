@@ -37,7 +37,8 @@ runs:
 
     - name: generate pgo data
       run: |
-        pip install bencode-rs --find-link pgo-wheel/
+        pip install -r ./requirements.txt
+        pip install bencode-rs --no-index --find-link pgo-wheel/
         python pytest tests/bench.py
       shell: bash
 
