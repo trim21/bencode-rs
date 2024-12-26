@@ -39,7 +39,7 @@ runs:
       run: |
         pip install -r ./requirements.txt
         pip install bencode-rs --no-index --find-link pgo-wheel/
-        python pytest tests/bench.py
+        pytest tests/bench.py
       shell: bash
 
     - name: merge pgo data
