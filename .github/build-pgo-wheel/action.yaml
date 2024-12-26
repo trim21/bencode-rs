@@ -56,7 +56,6 @@ runs:
         rustup run ${{ inputs.rust-toolchain }} bash -c 'echo "LLVM_PROFDATA=$RUSTUP_HOME/toolchains/$RUSTUP_TOOLCHAIN/lib/rustlib/${RUST_HOST}bin/llvm-profdata" >> "$GITHUB_ENV"'
       shell: bash
 
-
     - name: generate pgo data
       run: |
         pip install -r ./requirements.txt
