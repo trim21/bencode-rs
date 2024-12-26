@@ -5,6 +5,11 @@ inputs:
     description: 'Interpreter to build the wheel for'
     required: true
 
+  rust-toolchain:
+    description: "rust toolchain version"
+    required: false
+    default: '1.83'
+
 outputs:
   wheel:
     description: 'Path to the built wheel'
@@ -35,6 +40,13 @@ runs:
       env:
         RUSTFLAGS: '-Cprofile-generate=${{ github.workspace }}/profdata'
 
+    - name: detect rust host
+      run: |
+        echo RUST_HOST=$(rustc -Vv | grep host | cut -d ' ' -f 2) >> "$GITHUB_ENV"
+        RUST_HOST=$(rustc -Vv | grep host | cut -d ' ' -f 2)
+        rustup run ${{ inputs.rust-toolchain }} bash -c 'echo LLVM_PROFDATA=$RUSTUP_HOME/toolchains/$RUSTUP_TOOLCHAIN/lib/rustlib/$RUST_HOST/bin/llvm-profdata >> "$GITHUB_ENV"'
+      shell: bash
+
     - name: generate pgo data
       run: |
         pip install -r ./requirements.txt
@@ -43,7 +55,7 @@ runs:
       shell: bash
 
     - name: merge pgo data
-      run: llvm-profdata merge -o ${{ github.workspace }}/merged.profdata ${{ github.workspace }}/profdata
+      run: ${{ env.LLVM_PROFDATA }} merge -o ${{ github.workspace }}/merged.profdata ${{ github.workspace }}/profdata
       shell: bash
 
     - name: build pgo-optimized wheel
