@@ -114,7 +114,7 @@ jobs:
         run: |
           pip install pytest pytest-benchmark
           pip install bencode-rs --no-index --find-link pgo-wheel/
-          pytest tests/bench.py --benchmark-min-time=3
+          pytest tests/bench.py --benchmark-min-time=1
         shell: bash
 
       - name: merge pgo data
