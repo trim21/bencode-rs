@@ -102,11 +102,12 @@ jobs:
           toolchain: '${{ env.RUST_CHANNEL }}'
           components: llvm-tools-preview
 
+      - run: |
+          echo RUST_HOST=$(rustc -Vv | grep host | cut -d ' ' -f 2) >> "$GITHUB_ENV"
+
       - name: detect rust host
         run: |
-          echo RUST_HOST=$(rustc -Vv | grep host | cut -d ' ' -f 2) >> "$GITHUB_ENV"
-          RUST_HOST=$(rustc -Vv | grep host | cut -d ' ' -f 2)
-          rustup run '${{ env.RUST_CHANNEL }}' bash -c 'echo LLVM_PROFDATA=$RUSTUP_HOME/toolchains/$RUSTUP_TOOLCHAIN/lib/rustlib/${RUST_HOST}bin/llvm-profdata >> "$GITHUB_ENV"'
+          rustup run '${{ env.RUST_CHANNEL }}' bash -c 'echo LLVM_PROFDATA=$RUSTUP_HOME/toolchains/$RUSTUP_TOOLCHAIN/lib/rustlib/${{env.RUST_HOST}}/bin/llvm-profdata >> "$GITHUB_ENV"'
         shell: bash
 
       - name: generate pgo data
