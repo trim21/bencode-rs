@@ -157,6 +157,7 @@ jobs:
       - uses: actions/download-artifact@v4.1.8
         with:
           pattern: 'pgo-*'
+          merge-multiple: true
           path: dist
 
       - run: tree dist
