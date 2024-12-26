@@ -159,6 +159,8 @@ jobs:
           pattern: 'pgo-*'
           path: dist
 
+      - run: tree dist
+
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
