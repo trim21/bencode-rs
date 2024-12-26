@@ -112,7 +112,7 @@ jobs:
 
       - name: generate pgo data
         run: |
-          pip install -r ./requirements.txt
+          pip install pytest pytest-benchmark
           pip install bencode-rs --no-index --find-link pgo-wheel/
           pytest tests/bench.py --benchmark-min-time=3
         shell: bash
