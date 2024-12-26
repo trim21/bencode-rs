@@ -55,7 +55,7 @@ runs:
 
     - name: generate pgo data
       run: |
-        rustup run ${{ inputs.rust-toolchain }} bash -c 'ls -ahl $RUSTUP_HOME/toolchains/$RUSTUP_TOOLCHAIN/lib/rustlib/${RUST_HOST}bin'
+        rustup run ${{ inputs.rust-toolchain }} bash -c 'ls -ahl $RUSTUP_HOME/toolchains/$RUSTUP_TOOLCHAIN/lib/rustlib/${RUST_HOST}/bin/llvm-profdata >> "$GITHUB_ENV"'
         pip install -r ./requirements.txt
         pip install bencode-rs --no-index --find-link pgo-wheel/
         pytest tests/bench.py
