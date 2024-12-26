@@ -49,10 +49,13 @@ runs:
     - name: detect rust host
       run: |
         echo RUST_HOST=$(rustc -Vv | grep host | cut -d ' ' -f 2) >> "$GITHUB_ENV"
+      shell: bash
+
+    - run: |
         RUST_HOST=$(rustc -Vv | grep host | cut -d ' ' -f 2)
         rustup run ${{ inputs.rust-toolchain }} bash -c 'echo LLVM_PROFDATA=$RUSTUP_HOME/toolchains/$RUSTUP_TOOLCHAIN/lib/rustlib/${RUST_HOST}bin/llvm-profdata >> "$GITHUB_ENV"'
-        rustup run ${{ inputs.rust-toolchain }} bash -c 'ls -ahl $RUSTUP_HOME/toolchains/$RUSTUP_TOOLCHAIN/lib/rustlib/${RUST_HOST}bin >> "$GITHUB_ENV"'
       shell: bash
+
 
     - name: generate pgo data
       run: |
