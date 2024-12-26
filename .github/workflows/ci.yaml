@@ -107,14 +107,14 @@ jobs:
 
       - name: detect rust host
         run: |
-          rustup run '${{ env.RUST_CHANNEL }}' bash -c 'echo LLVM_PROFDATA=$RUSTUP_HOME/toolchains/$RUSTUP_TOOLCHAIN/lib/rustlib/${{env.RUST_HOST}}/bin/llvm-profdata >> "$GITHUB_ENV"'
+          rustup run '${{ env.RUST_CHANNEL }}' bash -c 'echo LLVM_PROFDATA=$RUSTUP_HOME/toolchains/$RUSTUP_TOOLCHAIN/lib/rustlib/${{ env.RUST_HOST }}/bin/llvm-profdata >> "$GITHUB_ENV"'
         shell: bash
 
       - name: generate pgo data
         run: |
           pip install pytest pytest-benchmark
           pip install bencode-rs --no-index --find-link pgo-wheel/
-          pytest tests/bench.py --benchmark-min-time=1
+          pytest tests/bench.py --benchmark-min-time=0.3
         shell: bash
 
       - name: merge pgo data
