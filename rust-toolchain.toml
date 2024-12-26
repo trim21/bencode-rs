@@ -1,4 +1,4 @@
 [toolchain]
 channel = "1.83"
-components = ["rustfmt", "rustc", "llvm-tools-preview"]
+components = ["rustfmt", "rustc"]
 profile = "minimal"
