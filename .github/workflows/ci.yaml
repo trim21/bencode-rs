@@ -64,6 +64,7 @@ jobs:
           RUST_BACKTRACE: 'full'
 
   pgo-wheel:
+    runs-on: "ubuntu-24.04"
     steps:
       - uses: actions/checkout@v4
 
