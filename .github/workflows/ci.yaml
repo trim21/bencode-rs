@@ -78,6 +78,8 @@ jobs:
           path: dist
 
   bench-cp:
+    needs: [pgo-wheel]
+
     strategy:
       matrix:
         python-version:
@@ -90,7 +92,7 @@ jobs:
 
       - uses: actions/download-artifact@v4.1.8
         with:
-          name: wheel
+          name: 'pgo-*'
           path: dist
 
       - name: Set up Python ${{ matrix.python-version }}
