@@ -68,7 +68,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: ./.github/build-pgo-wheel/action.yaml
+      - uses: ./.github/build-pgo-wheel/
         with:
           interpreter: '3.10'
 
