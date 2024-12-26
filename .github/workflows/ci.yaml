@@ -63,6 +63,20 @@ jobs:
         env:
           RUST_BACKTRACE: 'full'
 
+  pgo-wheel:
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/build-pgo-wheel/action.yaml
+        with:
+          interpreter: '3.10'
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: pgo-${{ runner.os }}
+          path: dist
+
   bench-cp:
     strategy:
       matrix:
@@ -73,7 +87,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - uses: actions/download-artifact@v4.1.8
+        with:
+          name: wheel
+          path: dist
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -81,9 +99,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
 
-      - run: pip install -r requirements.txt
-      - run: maturin build --release --out dist
       - run: pip install bencode-rs --no-index --find-links ./dist/
+      - run: pip install -r requirements.txt
 
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v3
