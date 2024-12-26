@@ -53,7 +53,7 @@ runs:
 
     - run: |
         RUST_HOST=$(rustc -Vv | grep host | cut -d ' ' -f 2)
-        rustup run ${{ inputs.rust-toolchain }} bash -c 'echo LLVM_PROFDATA=$RUSTUP_HOME/toolchains/$RUSTUP_TOOLCHAIN/lib/rustlib/${RUST_HOST}bin/llvm-profdata >> "$GITHUB_ENV"'
+        rustup run ${{ inputs.rust-toolchain }} bash -c 'echo "LLVM_PROFDATA=$RUSTUP_HOME/toolchains/$RUSTUP_TOOLCHAIN/lib/rustlib/${RUST_HOST}bin/llvm-profdata" >> "$GITHUB_ENV"'
       shell: bash
 
 
