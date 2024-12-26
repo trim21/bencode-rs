@@ -37,6 +37,7 @@ runs:
           --out pgo-wheel
           --interpreter ${{ inputs.interpreter }}
         docker-options: -e CI
+        rust-toolchain: ${{ inputs.rust-toolchain }}
       env:
         RUSTFLAGS: '-Cprofile-generate=${{ github.workspace }}/profdata'
 
@@ -72,5 +73,6 @@ runs:
           --out dist
           --interpreter ${{ inputs.interpreter }}
         docker-options: -e CI
+        rust-toolchain: ${{ inputs.rust-toolchain }}
       env:
         RUSTFLAGS: '-Cprofile-use=${{ github.workspace }}/merged.profdata'
