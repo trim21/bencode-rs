@@ -7,4 +7,4 @@ pre-commit
 # testing
 pytest
 pytest-codspeed==3.1.1
-pytest-github-actions-annotate-failures==0.2.0
+pytest-github-actions-annotate-failures==0.3.0
