@@ -1,10 +1,10 @@
 # build
-maturin>=1.7.8,<2.0
+maturin>=1.8.1,<2.0
 abi3audit
 pip
 # lint
 pre-commit
 # testing
 pytest
-pytest-codspeed==3.1.0
-pytest-github-actions-annotate-failures==0.2.0
+pytest-codspeed==3.1.2
+pytest-github-actions-annotate-failures==0.3.0
