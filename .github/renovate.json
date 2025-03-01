@@ -2,7 +2,7 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "local>trim21/renovate-config",
-    "github>Turbo87/renovate-config//rust/updateToolchain"
+    "github>trim21/renovate-config:rust"
   ],
   "lockFileMaintenance": {
     "enabled": true
