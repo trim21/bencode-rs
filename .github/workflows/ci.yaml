@@ -70,7 +70,7 @@ jobs:
     runs-on: "ubuntu-24.04"
     env:
       PY: '3.10'
-      RUST_CHANNEL: '1.83'
+      RUST_CHANNEL: '1.85'
     steps:
       - uses: actions/checkout@v4
 
@@ -100,7 +100,6 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: '${{ env.RUST_CHANNEL }}'
-          components: llvm-tools-preview
 
       - run: |
           echo RUST_HOST=$(rustc -Vv | grep host | cut -d ' ' -f 2) >> "$GITHUB_ENV"
