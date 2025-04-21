@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::HashMap;
 
 use pyo3::exceptions::PyTypeError;
 use pyo3::ffi::PyLong_FromString;
@@ -14,9 +15,10 @@ create_exception!(
 
 type DecodeError = BencodeDecodeError;
 
+
 #[pyfunction]
-#[pyo3(text_signature = "(b: Bytes, /)")]
-pub fn bdecode(b: &Bound<'_, PyAny>) -> PyResult<PyObject> {
+#[pyo3(text_signature = "(b: Bytes, decode_keys: List[Bytes], /)")]
+pub fn bdecode(b: &Bound<'_, PyAny>, decode_keys: Option<Vec<Vec<u8>>>) -> PyResult<PyObject> {
     let buf = match b.downcast::<PyBytes>() {
         Err(_) => {
             return Err(PyTypeError::new_err("can only decode bytes"));
@@ -29,11 +31,18 @@ pub fn bdecode(b: &Bound<'_, PyAny>) -> PyResult<PyObject> {
     if size == 0 {
         return Err(DecodeError::new_err("empty bytes"));
     }
+    let key_map: Option<HashMap<Vec<u8>, String>> = match decode_keys {
+        Some(v) => Some(v.iter()
+            .map(|x| (x.to_owned(), String::from_utf8(x.to_vec()).expect("Could not decode key")))
+            .collect()),
+        Option::None => None,
+    };
 
     let mut ctx = Decoder {
         bytes: buf.as_bytes(),
         index: 0,
         py: b.py(),
+        decode_keys: key_map
     };
 
     match ctx.decode_any() {
@@ -55,6 +64,7 @@ struct Decoder<'a> {
     bytes: &'a [u8],
     index: usize, // any torrent file larger than 4GiB?
     py: Python<'a>,
+    decode_keys: Option<HashMap<Vec<u8>, String>>
 }
 
 impl<'a> Decoder<'a> {
@@ -290,7 +300,12 @@ impl<'a> Decoder<'a> {
                             )));
                         }
                     }
-                    d.set_item(ck.clone(), value)?;
+
+                    if self.decode_keys.as_ref().is_none_or(|x| !x.contains_key(key.as_ref())) {
+                        d.set_item(ck.clone(), value)?;
+                    } else {
+                        d.set_item(self.decode_keys.as_ref().unwrap()[key].clone(), value)?;
+                    }
                     // map.insert(ck.clone(), value);
                     last_key = Some(ck);
                 }
