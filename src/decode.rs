@@ -17,7 +17,7 @@ type DecodeError = BencodeDecodeError;
 
 
 #[pyfunction]
-#[pyo3(text_signature = "(b: Bytes, decode_keys: List[Bytes], /)")]
+#[pyo3(signature = (b, decode_keys=None), text_signature = "(b: bytes, decode_keys: list[bytes] = None, /)")]
 pub fn bdecode(b: &Bound<'_, PyAny>, decode_keys: Option<Vec<Vec<u8>>>) -> PyResult<PyObject> {
     let buf = match b.downcast::<PyBytes>() {
         Err(_) => {
@@ -33,7 +33,7 @@ pub fn bdecode(b: &Bound<'_, PyAny>, decode_keys: Option<Vec<Vec<u8>>>) -> PyRes
     }
     let key_map: Option<HashMap<Vec<u8>, String>> = match decode_keys {
         Some(v) => Some(v.iter()
-            .map(|x| (x.to_owned(), String::from_utf8(x.to_vec()).expect("Could not decode key")))
+            .map(|x| (x.to_vec(), String::from_utf8(x.to_vec()).expect("Could not decode key")))
             .collect()),
         Option::None => None,
     };
