@@ -1,7 +1,8 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "local>trim21/renovate-config",
+    "github>trim21/renovate-config",
+    "github>trim21/renovate-config:python",
     "github>trim21/renovate-config:rust"
   ],
   "lockFileMaintenance": {
