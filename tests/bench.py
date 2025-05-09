@@ -58,3 +58,14 @@ def test_benchmark_encode_multiple_files_torrent(benchmark):
 
 def test_benchmark_decode_multiple_files_torrent(benchmark):
     benchmark(bencode2.bdecode, multiple_files_torrent)
+
+def test_benchmark_decode_multiple_files_torrent_str_keys(benchmark):
+    benchmark(lambda: bencode2.bdecode(
+        multiple_files_torrent,
+        decode_keys=[
+            b"announce", b"announce-list",
+            b"comment", b"created by",
+            b"creation_date", b"info", b"pieces",
+            b"length", b"files"
+        ]
+    ))
