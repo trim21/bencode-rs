@@ -66,7 +66,9 @@ fn release_ctx(mut ctx: Context) {
     ctx.stack_depth = 0;
 
     let mut pool = CONTEXT_POOL.lock().unwrap();
-    pool.push_back(ctx);
+    if pool.len() < 4 {
+        pool.push_back(ctx);
+    }
 }
 
 struct Context {
