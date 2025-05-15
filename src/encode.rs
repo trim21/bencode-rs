@@ -43,9 +43,8 @@ pub fn bencode<'py>(py: Python<'py>, v: &Bound<'py, PyAny>) -> PyResult<Bound<'p
 
 type EncodeError = BencodeEncodeError;
 
-// Using LazyLock from std instead of once_cell
-static CONTEXT_POOL: LazyLock<Mutex<SmallVec<[Context; 4]>>> =
-    LazyLock::new(|| Mutex::new(SmallVec::new()));
+static CONTEXT_POOL: LazyLock<Mutex<Vec<Context>>> =
+    LazyLock::new(|| Mutex::new(Vec::with_capacity(4)));
 
 fn get_ctx() -> Context {
     let mut pool = CONTEXT_POOL.lock().unwrap();
