@@ -1,5 +1,4 @@
 use bytes::BufMut;
-use once_cell::sync::Lazy;
 use pyo3::types::PyByteArray;
 use pyo3::{
     create_exception,
@@ -12,7 +11,7 @@ use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::io::Write;
-use syncpool::SyncPool;
+use std::sync::{LazyLock, Mutex};
 
 create_exception!(
     bencode_rs,
@@ -44,25 +43,30 @@ pub fn bencode<'py>(py: Python<'py>, v: &Bound<'py, PyAny>) -> PyResult<Bound<'p
 
 type EncodeError = BencodeEncodeError;
 
-static mut CONTEXT_POOL: Lazy<SyncPool<Context>> = Lazy::new(SyncPool::new);
+static CONTEXT_POOL: LazyLock<Mutex<Vec<Context>>> =
+    LazyLock::new(|| Mutex::new(Vec::with_capacity(4)));
 
 fn get_ctx() -> Context {
-    #[allow(static_mut_refs)]
-    unsafe {
-        *CONTEXT_POOL.get()
+    let mut pool = CONTEXT_POOL.lock().unwrap();
+
+    if let Some(ctx) = pool.pop() {
+        return ctx;
     }
+
+    return Context::default();
 }
 
 fn release_ctx(mut ctx: Context) {
     if ctx.buf.capacity() > MIB {
         return;
     }
-    ctx.buf.clear();
-    ctx.seen.clear();
-    ctx.stack_depth = 0;
-    unsafe {
-        #[allow(static_mut_refs)]
-        CONTEXT_POOL.put(Box::from(ctx));
+
+    let mut pool = CONTEXT_POOL.lock().unwrap();
+    if pool.len() < 4 {
+        ctx.buf.clear();
+        ctx.seen.clear();
+        ctx.stack_depth = 0;
+        pool.push(ctx);
     }
 }
 
