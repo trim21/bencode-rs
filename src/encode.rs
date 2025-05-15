@@ -9,7 +9,7 @@ use pyo3::{
 use pyo3::{ffi, PyTypeCheck};
 use smallvec::SmallVec;
 use std::borrow::Cow;
-use std::collections::{HashSet, VecDeque};
+use std::collections::HashSet;
 use std::io::Write;
 use std::sync::{LazyLock, Mutex};
 
