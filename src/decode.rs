@@ -17,11 +17,8 @@ type DecodeError = BencodeDecodeError;
 #[pyfunction]
 #[pyo3(text_signature = "(b: Bytes, /)")]
 pub fn bdecode(b: &Bound<'_, PyAny>) -> PyResult<PyObject> {
-    let buf = match b.downcast::<PyBytes>() {
-        Err(_) => {
-            return Err(PyTypeError::new_err("can only decode bytes"));
-        }
-        Ok(b) => b,
+    let Ok(buf) = b.downcast::<PyBytes>() else {
+        return Err(PyTypeError::new_err("can only decode bytes"));
     };
 
     let size = buf.len()?;
