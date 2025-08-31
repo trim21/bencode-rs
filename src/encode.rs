@@ -239,7 +239,7 @@ fn __encode_str(v: &[u8], ctx: &mut Context) -> PyResult<()> {
 }
 
 struct AutoFree {
-    pub ptr: *mut ffi::Py<PyAny>,
+    pub ptr: *mut ffi::PyObject,
 }
 
 impl Drop for AutoFree {
