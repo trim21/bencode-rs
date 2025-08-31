@@ -16,7 +16,7 @@ type DecodeError = BencodeDecodeError;
 
 #[pyfunction]
 #[pyo3(text_signature = "(b: Bytes, /)")]
-pub fn bdecode(b: &Bound<'_, PyAny>) -> PyResult<PyObject> {
+pub fn bdecode(b: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
     let Ok(buf) = b.downcast::<PyBytes>() else {
         return Err(PyTypeError::new_err("can only decode bytes"));
     };
@@ -55,7 +55,7 @@ struct Decoder<'a> {
 }
 
 impl<'a> Decoder<'a> {
-    fn decode_any(&mut self) -> Result<PyObject, PyErr> {
+    fn decode_any(&mut self) -> Result<Py<PyAny>, PyErr> {
         match self.current_byte()? {
             b'i' => self.decode_int(),
             b'0'..=b'9' => {
@@ -119,7 +119,7 @@ impl<'a> Decoder<'a> {
         Ok(str_buff)
     }
 
-    fn decode_int(&mut self) -> Result<PyObject, PyErr> {
+    fn decode_int(&mut self) -> Result<Py<PyAny>, PyErr> {
         let index_e = match self.bytes[self.index..].iter().position(|&b| b == b'e') {
             Some(i) => i,
             None => return Err(DecodeError::new_err("invalid int")),
@@ -220,7 +220,7 @@ impl<'a> Decoder<'a> {
     }
 
     // support int may overflow i128/u128
-    fn decode_int_slow(&mut self, index_e: usize) -> Result<PyObject, PyErr> {
+    fn decode_int_slow(&mut self, index_e: usize) -> Result<Py<PyAny>, PyErr> {
         let s = &self.bytes[self.index..index_e];
 
         self.index = index_e + 1;
@@ -233,9 +233,9 @@ impl<'a> Decoder<'a> {
         }
     }
 
-    fn decode_list(&mut self) -> PyResult<PyObject> {
+    fn decode_list(&mut self) -> PyResult<Py<PyAny>> {
         self.index += 1;
-        let mut l = smallvec::SmallVec::<[PyObject; 8]>::new();
+        let mut l = smallvec::SmallVec::<[Py<PyAny>; 8]>::new();
 
         loop {
             match self.bytes.get(self.index) {
@@ -256,7 +256,7 @@ impl<'a> Decoder<'a> {
         Ok(PyList::new(self.py, l)?.unbind().into_any())
     }
 
-    fn decode_dict(&mut self) -> Result<PyObject, PyErr> {
+    fn decode_dict(&mut self) -> Result<Py<PyAny>, PyErr> {
         self.index += 1;
 
         let d = PyDict::new(self.py);
