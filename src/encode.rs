@@ -239,7 +239,7 @@ fn __encode_str(v: &[u8], ctx: &mut Context) -> PyResult<()> {
 }
 
 struct AutoFree {
-    pub ptr: *mut ffi::PyObject,
+    pub ptr: *mut ffi::Py<PyAny>,
 }
 
 impl Drop for AutoFree {
@@ -275,7 +275,7 @@ fn encode_int<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
             return Err(PyErr::fetch(py));
         }
 
-        let ss = PyObject::from_owned_ptr(py, s);
+        let ss = Py<PyAny>::from_owned_ptr(py, s);
 
         let s = ss.downcast_bound_unchecked::<PyString>(py);
         ctx.buf.put(s.to_str()?.as_bytes());
