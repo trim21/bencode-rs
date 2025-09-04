@@ -9,7 +9,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.13.7"
       - name: Build sdist
@@ -54,7 +54,7 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         if: ${{ runner.os != 'Linux' }}
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         if: ${{ runner.os != 'Linux' }}
         with:
           python-version: "3.13.7"
