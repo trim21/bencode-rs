@@ -98,7 +98,7 @@ impl Context {
 
 fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>) -> PyResult<()> {
     if PyString::type_check(value) {
-        let s = unsafe { value.downcast_unchecked::<PyString>() };
+        let s = unsafe { value.cast_unchecked::<PyString>() };
         let b = s.to_str()?;
         ctx.write_int(b.len())?;
         ctx.buf.put_u8(b':');
@@ -107,7 +107,7 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
     }
 
     if PyBytes::type_check(value) {
-        let bytes = unsafe { value.downcast_unchecked::<PyBytes>() };
+        let bytes = unsafe { value.cast_unchecked::<PyBytes>() };
 
         let b = bytes.as_bytes();
 
@@ -139,7 +139,7 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
         }
 
         unsafe {
-            encode_dict(ctx, py, value.downcast_unchecked())?;
+            encode_dict(ctx, py, value.cast_unchecked())?;
         }
 
         if checked {
@@ -165,7 +165,7 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
 
         ctx.buf.put_u8(b'l');
 
-        let seq = unsafe { value.downcast_unchecked::<PyList>() };
+        let seq = unsafe { value.cast_unchecked::<PyList>() };
 
         for x in seq.iter() {
             encode_any(ctx, py, &x)?;
@@ -196,7 +196,7 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
 
         ctx.buf.put_u8(b'l');
 
-        let seq = unsafe { value.downcast_unchecked::<PyTuple>() };
+        let seq = unsafe { value.cast_unchecked::<PyTuple>() };
 
         for x in seq.iter() {
             encode_any(ctx, py, &x)?;
@@ -212,7 +212,7 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
     }
 
     if PyByteArray::type_check(value) {
-        let bytes = unsafe { value.downcast_unchecked::<PyByteArray>() };
+        let bytes = unsafe { value.cast_unchecked::<PyByteArray>() };
 
         let b = unsafe { bytes.as_bytes() };
 
@@ -251,7 +251,7 @@ impl Drop for AutoFree {
 }
 
 fn encode_int<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>) -> PyResult<()> {
-    let v = unsafe { value.downcast_unchecked::<PyInt>() };
+    let v = unsafe { value.cast_unchecked::<PyInt>() };
 
     if let Ok(v) = v.extract::<i64>() {
         ctx.buf.put_u8(b'i');
@@ -277,7 +277,7 @@ fn encode_int<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
 
         let ss = Py::<PyAny>::from_owned_ptr(py, s);
 
-        let s = ss.downcast_bound_unchecked::<PyString>(py);
+        let s = ss.cast_bound_unchecked::<PyString>(py);
         ctx.buf.put(s.to_str()?.as_bytes());
     };
 
@@ -306,7 +306,7 @@ fn encode_dict<'py>(ctx: &mut Context, py: Python<'py>, v: &Bound<'py, PyDict>) 
             continue;
         }
 
-        if let Ok(b) = key.downcast::<PyBytes>() {
+        if let Ok(b) = key.cast::<PyBytes>() {
             unsafe {
                 // d.as_bytes() return a &[u8] and doesn't live longer than variable `key`,
                 // but it's not true, &[u8] lives as long as python ptr lives,
