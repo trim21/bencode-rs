@@ -11,5 +11,13 @@
   "cargo": {
     "enabled": true
   },
-  "rangeStrategy": "bump"
+  "rangeStrategy": "bump",
+  "packageRules": [
+    {
+      "matchDepTypes": [
+        "requires-python"
+      ],
+      "enabled": false
+    }
+  ]
 }
