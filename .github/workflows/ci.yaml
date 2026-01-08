@@ -177,7 +177,7 @@ jobs:
           cargo build
           ls target/debug -ahl
           cp target/debug/libbencode.so py/bencode_rs/_bencode.so
-          bash -c "PYTHONPATH=py pytest tests"
+          PYTHONPATH=py pytest tests
           cargo llvm-cov report --lcov --output-path coverage.lcov
 
       - uses: codecov/codecov-action@v5
