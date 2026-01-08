@@ -76,7 +76,7 @@ dev = [
     { name = "pytest", specifier = ">=8.3,<9.0" },
     { name = "pytest-codspeed", specifier = "==4.2.0" },
     { name = "pytest-github-actions-annotate-failures", specifier = "==0.3.0" },
-    { name = "twine" },
+    { name = "twine", specifier = ">=6" },
 ]
 
 [[package]]
@@ -426,6 +426,18 @@ wheels = [
 ]
 
 [[package]]
+name = "id"
+version = "1.5.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/22/11/102da08f88412d875fa2f1a9a469ff7ad4c874b0ca6fed0048fe385bdb3d/id-1.5.0.tar.gz", hash = "sha256:292cb8a49eacbbdbce97244f47a97b4c62540169c976552e497fd57df0734c1d", size = 15237, upload-time = "2024-12-04T19:53:05.575Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9f/cb/18326d2d89ad3b0dd143da971e77afd1e6ca6674f1b1c3df4b6bec6279fc/id-1.5.0-py3-none-any.whl", hash = "sha256:f1434e1cef91f2cbb8a4ec64663d5a23b9ed43ef44c4c957d02583d61714c658", size = 13611, upload-time = "2024-12-04T19:53:03.02Z" },
+]
+
+[[package]]
 name = "identify"
 version = "2.6.15"
 source = { registry = "https://pypi.org/simple" }
@@ -665,15 +677,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/03/4f/2750f7f6f025a1507cd3b7218691671eecfd0bbebebe8b39aa0fe1d360b8/pefile-2024.8.26.tar.gz", hash = "sha256:3ff6c5d8b43e8c37bb6e6dd5085658d658a7a0bdcd20b6a07b1fcfc1c4e9d632", size = 76008, upload-time = "2024-08-26T20:58:38.155Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/54/16/12b82f791c7f50ddec566873d5bdd245baa1491bac11d15ffb98aecc8f8b/pefile-2024.8.26-py3-none-any.whl", hash = "sha256:76f8b485dcd3b1bb8166f1128d395fa3d87af26360c2358fb75b80019b957c6f", size = 74766, upload-time = "2024-08-26T21:01:02.632Z" },
-]
-
-[[package]]
-name = "pkginfo"
-version = "1.10.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/2f/72/347ec5be4adc85c182ed2823d8d1c7b51e13b9a6b0c1aae59582eca652df/pkginfo-1.10.0.tar.gz", hash = "sha256:5df73835398d10db79f8eecd5cd86b1f6d29317589ea70796994d49399af6297", size = 378457, upload-time = "2024-03-03T08:34:21.011Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/56/09/054aea9b7534a15ad38a363a2bd974c20646ab1582a387a95b8df1bfea1c/pkginfo-1.10.0-py3-none-any.whl", hash = "sha256:889a6da2ed7ffc58ab5b900d888ddce90bce912f2d2de1dc1c26f4cb9fe65097", size = 30392, upload-time = "2024-03-03T08:34:18.891Z" },
 ]
 
 [[package]]
@@ -1010,12 +1013,12 @@ wheels = [
 
 [[package]]
 name = "twine"
-version = "5.1.1"
+version = "6.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "importlib-metadata" },
-    { name = "keyring" },
-    { name = "pkginfo" },
+    { name = "id" },
+    { name = "keyring", marker = "platform_machine != 'ppc64le' and platform_machine != 's390x'" },
+    { name = "packaging" },
     { name = "readme-renderer" },
     { name = "requests" },
     { name = "requests-toolbelt" },
@@ -1023,9 +1026,9 @@ dependencies = [
     { name = "rich" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/77/68/bd982e5e949ef8334e6f7dcf76ae40922a8750aa2e347291ae1477a4782b/twine-5.1.1.tar.gz", hash = "sha256:9aa0825139c02b3434d913545c7b847a21c835e11597f5255842d457da2322db", size = 225531, upload-time = "2024-06-26T15:00:46.58Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e0/a8/949edebe3a82774c1ec34f637f5dd82d1cf22c25e963b7d63771083bbee5/twine-6.2.0.tar.gz", hash = "sha256:e5ed0d2fd70c9959770dce51c8f39c8945c574e18173a7b81802dab51b4b75cf", size = 172262, upload-time = "2025-09-04T15:43:17.255Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5d/ec/00f9d5fd040ae29867355e559a94e9a8429225a0284a3f5f091a3878bfc0/twine-5.1.1-py3-none-any.whl", hash = "sha256:215dbe7b4b94c2c50a7315c0275d2258399280fbb7d04182c7e55e24b5f93997", size = 38650, upload-time = "2024-06-26T15:00:43.825Z" },
+    { url = "https://files.pythonhosted.org/packages/3a/7a/882d99539b19b1490cac5d77c67338d126e4122c8276bf640e411650c830/twine-6.2.0-py3-none-any.whl", hash = "sha256:418ebf08ccda9a8caaebe414433b0ba5e25eb5e4a927667122fbe8f829f985d8", size = 42727, upload-time = "2025-09-04T15:43:15.994Z" },
 ]
 
 [[package]]

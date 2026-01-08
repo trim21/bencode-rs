@@ -58,13 +58,13 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
+          activate-environment: true
 
       - name: Install Python deps from lock (dev)
         run: |
-          uv export --locked --group dev --no-hashes > "${{ runner.temp }}/uv-dev-requirements.txt"
-          python -m pip install -r "${{ runner.temp }}/uv-dev-requirements.txt"
+          uv sync --locked --group dev
 
-      - run: pip install bencode-rs --no-index --find-links ./dist/
+      - run: uv pip install bencode-rs --no-index --find-links ./dist/
 
       - run: pytest -sv
         env:
@@ -91,14 +91,14 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
+          activate-environment: true
 
       - name: Install Python deps from lock (dev)
         run: |
-          uv export --locked --group dev --no-hashes > "${{ runner.temp }}/uv-dev-requirements.txt"
-          python -m pip install -r "${{ runner.temp }}/uv-dev-requirements.txt"
+          uv sync --locked --group dev
 
       - run: maturin build --release --out dist
-      - run: pip install bencode-rs --no-index --find-links ./dist/
+      - run: uv pip install bencode-rs --no-index --find-links ./dist/
 
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v4
