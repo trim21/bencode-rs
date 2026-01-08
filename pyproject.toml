@@ -31,7 +31,22 @@ keywords = [
 [project.urls]
 Homepage = 'https://github.com/trim21/bencode-rs'
 
+[dependency-groups]
+dev = [
+    "abi3audit>=0.0.25,<1.0",
+    "black>=24.10,<25.0",
+    "maturin>=1.11.3,<2.0",
+    "pre-commit>=3.8,<4.0",
+    "pytest>=8.3,<9.0",
+    "pytest-codspeed==4.2.0",
+    "pytest-github-actions-annotate-failures==0.3.0",
+    "twine>=5.1,<6.0",
+]
+
 [tool.maturin]
 features = ["pyo3/extension-module"]
 module-name = "bencode_rs._bencode"
 python-source = "py"
+
+[tool.uv]
+package = false
