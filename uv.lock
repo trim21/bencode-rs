@@ -76,7 +76,7 @@ dev = [
     { name = "pytest", specifier = ">=8.3,<9.0" },
     { name = "pytest-codspeed", specifier = "==4.2.0" },
     { name = "pytest-github-actions-annotate-failures", specifier = "==0.3.0" },
-    { name = "twine", specifier = ">=5.1,<6.0" },
+    { name = "twine" },
 ]
 
 [[package]]

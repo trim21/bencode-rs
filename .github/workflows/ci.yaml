@@ -57,10 +57,13 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
         with:
-          activate-environment: true
           enable-cache: true
 
-      - run: uv sync --locked --group dev --no-install-project
+      - name: Install Python deps from lock (dev)
+        run: |
+          uv export --locked --group dev --no-hashes > "${{ runner.temp }}/uv-dev-requirements.txt"
+          python -m pip install -r "${{ runner.temp }}/uv-dev-requirements.txt"
+
       - run: pip install bencode-rs --no-index --find-links ./dist/
 
       - run: pytest -sv
@@ -87,10 +90,13 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
         with:
-          activate-environment: true
           enable-cache: true
 
-      - run: uv sync --locked --group dev --no-install-project
+      - name: Install Python deps from lock (dev)
+        run: |
+          uv export --locked --group dev --no-hashes > "${{ runner.temp }}/uv-dev-requirements.txt"
+          python -m pip install -r "${{ runner.temp }}/uv-dev-requirements.txt"
+
       - run: maturin build --release --out dist
       - run: pip install bencode-rs --no-index --find-links ./dist/
 
@@ -116,10 +122,12 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
         with:
-          activate-environment: true
           enable-cache: true
 
-      - run: uv sync --locked --group dev --no-install-project
+      - name: Install Python deps from lock (dev)
+        run: |
+          uv export --locked --group dev --no-hashes > "${{ runner.temp }}/uv-dev-requirements.txt"
+          python -m pip install -r "${{ runner.temp }}/uv-dev-requirements.txt"
 
       - uses: actions/download-artifact@v7
         with:
@@ -152,7 +160,6 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
         with:
-          activate-environment: true
           enable-cache: true
 
       - uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -162,7 +169,10 @@ jobs:
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
 
-      - run: uv sync --locked --group dev --no-install-project
+      - name: Install Python deps from lock (dev)
+        run: |
+          uv export --locked --group dev --no-hashes > "${{ runner.temp }}/uv-dev-requirements.txt"
+          python -m pip install -r "${{ runner.temp }}/uv-dev-requirements.txt"
 
       - name: Run coverage
         run: |

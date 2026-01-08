@@ -5,7 +5,7 @@ build-backend = "maturin"
 [project]
 name = "bencode-rs"
 version = "0.0.7"
-requires-python = "~=3.10"
+requires-python = ">=3.10,<4"
 description = "a bencode parser build with pyo3"
 readme = "readme.md"
 classifiers = [
@@ -40,7 +40,7 @@ dev = [
     "pytest>=8.3,<9.0",
     "pytest-codspeed==4.2.0",
     "pytest-github-actions-annotate-failures==0.3.0",
-    "twine>=5.1,<6.0",
+    "twine",
 ]
 
 [tool.maturin]
