@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  autofix:
+  cargo:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -22,5 +22,26 @@ jobs:
       - run: cargo fmt
 
       - run: cargo clippy --fix
+
+      - uses: autofix-ci/action@v1
+
+
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: "${{ matrix.python-version }}"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - run: uv sync --dev
+
+      - uses: trim21/actions/pre-commit@master
 
       - uses: autofix-ci/action@v1
