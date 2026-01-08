@@ -124,10 +124,7 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Install Python deps from lock (dev)
-        run: |
-          uv export --locked --group dev --no-hashes > "${{ runner.temp }}/uv-dev-requirements.txt"
-          python -m pip install -r "${{ runner.temp }}/uv-dev-requirements.txt"
+      - run: uv sync --dev
 
       - uses: actions/download-artifact@v7
         with:
@@ -169,10 +166,7 @@ jobs:
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
 
-      - name: Install Python deps from lock (dev)
-        run: |
-          uv export --locked --group dev --no-hashes > "${{ runner.temp }}/uv-dev-requirements.txt"
-          python -m pip install -r "${{ runner.temp }}/uv-dev-requirements.txt"
+      - run: uv sync --dev
 
       - name: Run coverage
         run: |
