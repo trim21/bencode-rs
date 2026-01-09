@@ -1,5 +1,5 @@
 [build-system]
-requires = ["maturin==1.11.4"]
+requires = ["maturin==1.11.5"]
 build-backend = "maturin"
 
 [project]
@@ -34,7 +34,7 @@ Homepage = 'https://github.com/trim21/bencode-rs'
 [dependency-groups]
 dev = [
     "abi3audit>=0.0.25,<1.0",
-    "maturin>=1.11.4,<2.0",
+    "maturin>=1.11.5,<2.0",
     "pytest>=9.0.2,<9.1",
     "pytest-codspeed==4.2.0",
     "pytest-github-actions-annotate-failures==0.3.0",
