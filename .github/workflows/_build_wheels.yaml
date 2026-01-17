@@ -32,21 +32,34 @@ jobs:
           - runner: macos-15
             target: aarch64
             py: arm64
+            manylinux: auto
 
           - runner: windows-latest
             target: x64
             py: x64
+            manylinux: auto
 
           - runner: ubuntu-24.04
             target: x86_64
-          - runner: ubuntu-24.04
+            manylinux: auto
+          - runner: ubuntu-24.04-arm
             target: aarch64
+            manylinux: auto
           - runner: ubuntu-24.04
             target: armv7
+            manylinux: auto
           - runner: ubuntu-24.04
             target: s390x
+            manylinux: auto
           - runner: ubuntu-24.04
             target: ppc64le
+            manylinux: auto
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-musl
+            manylinux: musllinux_1_2
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+            manylinux: musllinux_1_2
 
     steps:
       - uses: actions/checkout@v6
@@ -66,7 +79,7 @@ jobs:
           target: ${{ matrix.platform.target }}
           args: --release --out dist
           sccache: "true"
-          manylinux: auto
+          manylinux: ${{ matrix.platform.manylinux }}
 
       - name: Upload wheels
         uses: actions/upload-artifact@v6
