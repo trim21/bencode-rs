@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "bencode-rs"
-version = "0.0.7"
+version = "0.0.8"
 requires-python = ">=3.10,<4"
 description = "a bencode parser build with pyo3"
 readme = "readme.md"
