@@ -4,7 +4,7 @@ requires-python = ">=3.10, <4"
 
 [[package]]
 name = "abi3audit"
-version = "0.0.25"
+version = "0.0.26"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "abi3info" },
@@ -16,9 +16,9 @@ dependencies = [
     { name = "requests-cache" },
     { name = "rich" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7c/ac/8caab3d2e50ef1b9f03a42e33854d9c3e12842f79702b2051cf6f5d76b7e/abi3audit-0.0.25.tar.gz", hash = "sha256:d18f0ccd482084d002ba3135003e11ad87a7f5a5de4ae0d1485df06ece417236", size = 29419, upload-time = "2025-12-11T05:52:53.543Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/99/2d/fa16448d36021e36caa71acda36e25be8f6315b9c740b1be8bdae5c76257/abi3audit-0.0.26.tar.gz", hash = "sha256:44b5fa5ddc8acdfdbd221f400d48b8a205df519e8f4c6d57a349837ac88d0ff8", size = 29398, upload-time = "2026-01-23T20:18:48.177Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b9/ff/2de6eb037cca7d8efe6ed3aaa116013b199fa34197a2793db98444cfb3f8/abi3audit-0.0.25-py3-none-any.whl", hash = "sha256:d34adbfab067fee10ec528759ae4cfb43d0cc7de9a21f2a3918831fed3bbeb14", size = 30342, upload-time = "2025-12-11T05:52:52.493Z" },
+    { url = "https://files.pythonhosted.org/packages/75/a8/4bbc458cc2dcb14b0a13be9593bb70f7d424c8244e632e16dbf4aa6cb778/abi3audit-0.0.26-py3-none-any.whl", hash = "sha256:b94b774984e50ec03481c1dda88c48079f6baec870b263bf7f5e7415feb8802d", size = 30302, upload-time = "2026-01-23T20:18:46.62Z" },
 ]
 
 [[package]]
@@ -67,7 +67,7 @@ dev = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "abi3audit", specifier = ">=0.0.25,<1.0" },
+    { name = "abi3audit", specifier = ">=0.0.26,<1.0" },
     { name = "maturin", specifier = ">=1.11.5,<2.0" },
     { name = "pytest", specifier = ">=9.0.2,<9.1" },
     { name = "pytest-codspeed", specifier = "==4.2.0" },
