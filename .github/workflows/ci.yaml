@@ -179,7 +179,7 @@ jobs:
           source <(cargo llvm-cov show-env --export-prefix)
           export CARGO_TARGET_DIR=$CARGO_LLVM_COV_TARGET_DIR
           maturin develop --uv
-          PYTHONPATH=py pytest tests
+          pytest tests
           cargo llvm-cov report --lcov --output-path coverage.lcov
 
       - uses: codecov/codecov-action@v5
