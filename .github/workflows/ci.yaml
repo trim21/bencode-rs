@@ -166,7 +166,9 @@ jobs:
           components: llvm-tools
 
       - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
 
       - run: uv sync --dev
       - run: uv tool install maturin
@@ -176,11 +178,6 @@ jobs:
           set -euxo pipefail
           source <(cargo llvm-cov show-env --export-prefix)
           export CARGO_TARGET_DIR=$CARGO_LLVM_COV_TARGET_DIR
-          cargo llvm-cov clean --workspace
-          cargo build
-          ls target/debug -ahl
-          ldd target/debug/libbencode.so
-          cp target/debug/libbencode.so py/bencode_rs/_bencode.so
           maturin develop --uv
           PYTHONPATH=py pytest tests
           cargo llvm-cov report --lcov --output-path coverage.lcov
