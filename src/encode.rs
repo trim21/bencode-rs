@@ -275,9 +275,9 @@ fn encode_int<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
             return Err(PyErr::fetch(py));
         }
 
-        let ss = Py::<PyAny>::from_owned_ptr(py, s);
+        let ss = Bound::<PyAny>::from_owned_ptr(py, s);
 
-        let s = ss.cast_bound_unchecked::<PyString>(py);
+        let s = ss.cast_unchecked::<PyString>();
         ctx.buf.put(s.to_str()?.as_bytes());
     };
 

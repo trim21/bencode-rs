@@ -229,7 +229,7 @@ impl<'a> Decoder<'a> {
 
         unsafe {
             let ptr = PyLong_FromString(c_str.as_ptr(), std::ptr::null_mut(), 10);
-            Py::from_owned_ptr_or_err(self.py, ptr)
+            Bound::from_owned_ptr_or_err(self.py, ptr).map(|b| b.unbind())
         }
     }
 
