@@ -1,12 +1,13 @@
 use bytes::BufMut;
+use pyo3::buffer::{PyBuffer, ReadOnlyCell};
 use pyo3::types::PyByteArray;
+use pyo3::PyTypeCheck;
 use pyo3::{
     create_exception,
     exceptions::PyTypeError,
     prelude::*,
     types::{PyBytes, PyDict, PyInt, PyList, PyString, PyTuple},
 };
-use pyo3::{ffi, PyTypeCheck};
 use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::collections::HashSet;
@@ -119,7 +120,7 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
     }
 
     if PyInt::type_check(value) {
-        return encode_int(ctx, py, value);
+        return encode_int(ctx, value);
     }
 
     let ptr = value.as_ptr().cast::<()>() as usize;
@@ -150,76 +151,38 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
     }
 
     if PyList::type_check(value) {
-        ctx.stack_depth += 1;
-        let checked = ctx.stack_depth >= 100;
-
-        if checked {
-            if ctx.seen.contains(&ptr) {
-                let repr = value.repr()?.to_string();
-                return Err(BencodeEncodeError::new_err(format!(
-                    "circular reference found: {repr}"
-                )));
-            }
-            ctx.seen.insert(ptr);
-        }
-
-        ctx.buf.put_u8(b'l');
-
-        let seq = unsafe { value.cast_unchecked::<PyList>() };
-
-        for x in seq.iter() {
-            encode_any(ctx, py, &x)?;
-        }
-
-        ctx.buf.put_u8(b'e');
-
-        if checked {
-            ctx.seen.remove(&ptr);
-        }
-
-        return Ok(());
+        return encode_list(ctx, py, value, ptr);
     }
 
     if PyTuple::type_check(value) {
-        ctx.stack_depth += 1;
-        let checked = ctx.stack_depth >= 100;
-
-        if checked {
-            if ctx.seen.contains(&ptr) {
-                let repr = value.repr()?.to_string();
-                return Err(BencodeEncodeError::new_err(format!(
-                    "circular reference found: {repr}"
-                )));
-            }
-            ctx.seen.insert(ptr);
-        }
-
-        ctx.buf.put_u8(b'l');
-
-        let seq = unsafe { value.cast_unchecked::<PyTuple>() };
-
-        for x in seq.iter() {
-            encode_any(ctx, py, &x)?;
-        }
-
-        ctx.buf.put_u8(b'e');
-
-        if checked {
-            ctx.seen.remove(&ptr);
-        }
-
-        return Ok(());
+        return encode_tuple(ctx, py, value, ptr);
     }
 
     if PyByteArray::type_check(value) {
-        let bytes = unsafe { value.cast_unchecked::<PyByteArray>() };
+        return encode_byte_array(ctx, value);
+    }
 
-        let b = unsafe { bytes.as_bytes() };
+    // Accept any object implementing the buffer protocol (e.g. memoryview, array, numpy).
+    // Use the high-level PyO3 buffer API (requires full API or `abi3-py311+`).
+    if let Ok(buffer) = PyBuffer::<u8>::get(value) {
+        if let Some(slice) = buffer.as_slice(py) {
+            let len = slice.len();
+            ctx.write_int(len)?;
+            ctx.buf.put_u8(b':');
 
-        ctx.write_int(b.len())?;
+            debug_assert_eq!(std::mem::size_of::<ReadOnlyCell<u8>>(), 1);
+            debug_assert_eq!(std::mem::align_of::<ReadOnlyCell<u8>>(), 1);
+
+            let bytes: &[u8] =
+                unsafe { std::slice::from_raw_parts(slice.as_ptr().cast::<u8>(), len) };
+            ctx.buf.extend_from_slice(bytes);
+            return Ok(());
+        }
+
+        let bytes = buffer.to_vec(py)?;
+        ctx.write_int(bytes.len())?;
         ctx.buf.put_u8(b':');
-        ctx.buf.put(b);
-
+        ctx.buf.put(bytes.as_slice());
         return Ok(());
     }
 
@@ -238,19 +201,7 @@ fn __encode_str(v: &[u8], ctx: &mut Context) -> PyResult<()> {
     Ok(())
 }
 
-struct AutoFree {
-    pub ptr: *mut ffi::PyObject,
-}
-
-impl Drop for AutoFree {
-    fn drop(&mut self) {
-        unsafe {
-            ffi::Py_DecRef(self.ptr);
-        }
-    }
-}
-
-fn encode_int<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>) -> PyResult<()> {
+fn encode_int(ctx: &mut Context, value: &Bound<'_, PyAny>) -> PyResult<()> {
     let v = unsafe { value.cast_unchecked::<PyInt>() };
 
     if let Ok(v) = v.extract::<i64>() {
@@ -261,27 +212,95 @@ fn encode_int<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
         return Ok(());
     }
 
+    // Slow path for big ints: use Python's string conversion.
+    let as_int = value.call_method0("__int__")?;
     ctx.buf.put_u8(b'i');
+    let s = as_int.str()?;
+    ctx.buf.put(s.to_str()?.as_bytes());
+    ctx.buf.put_u8(b'e');
+    Ok(())
+}
 
-    unsafe {
-        let i = ffi::PyNumber_Long(value.as_ptr());
-        if i.is_null() {
-            return Err(PyErr::fetch(py));
+fn encode_byte_array(ctx: &mut Context, value: &Bound<'_, PyAny>) -> PyResult<()> {
+    let bytes = unsafe { value.cast_unchecked::<PyByteArray>() };
+
+    let b = unsafe { bytes.as_bytes() };
+
+    ctx.write_int(b.len())?;
+    ctx.buf.put_u8(b':');
+    ctx.buf.put(b);
+
+    Ok(())
+}
+
+fn encode_list<'py>(
+    ctx: &mut Context,
+    py: Python<'py>,
+    value: &Bound<'py, PyAny>,
+    ptr: usize,
+) -> PyResult<()> {
+    ctx.stack_depth += 1;
+    let checked = ctx.stack_depth >= 100;
+
+    if checked {
+        if ctx.seen.contains(&ptr) {
+            let repr = value.repr()?.to_string();
+            return Err(BencodeEncodeError::new_err(format!(
+                "circular reference found: {repr}"
+            )));
         }
+        ctx.seen.insert(ptr);
+    }
 
-        let o = AutoFree { ptr: i };
-        let s = ffi::PyObject_Str(o.ptr);
-        if s.is_null() {
-            return Err(PyErr::fetch(py));
-        }
+    ctx.buf.put_u8(b'l');
 
-        let ss = Bound::<PyAny>::from_owned_ptr(py, s);
+    let seq = unsafe { value.cast_unchecked::<PyList>() };
 
-        let s = ss.cast_unchecked::<PyString>();
-        ctx.buf.put(s.to_str()?.as_bytes());
-    };
+    for x in seq.iter() {
+        encode_any(ctx, py, &x)?;
+    }
 
     ctx.buf.put_u8(b'e');
+
+    if checked {
+        ctx.seen.remove(&ptr);
+    }
+
+    Ok(())
+}
+
+fn encode_tuple<'py>(
+    ctx: &mut Context,
+    py: Python<'py>,
+    value: &Bound<'py, PyAny>,
+    ptr: usize,
+) -> PyResult<()> {
+    ctx.stack_depth += 1;
+    let checked = ctx.stack_depth >= 100;
+
+    if checked {
+        if ctx.seen.contains(&ptr) {
+            let repr = value.repr()?.to_string();
+            return Err(BencodeEncodeError::new_err(format!(
+                "circular reference found: {repr}"
+            )));
+        }
+        ctx.seen.insert(ptr);
+    }
+
+    ctx.buf.put_u8(b'l');
+
+    let seq = unsafe { value.cast_unchecked::<PyTuple>() };
+
+    for x in seq.iter() {
+        encode_any(ctx, py, &x)?;
+    }
+
+    ctx.buf.put_u8(b'e');
+
+    if checked {
+        ctx.seen.remove(&ptr);
+    }
 
     Ok(())
 }
