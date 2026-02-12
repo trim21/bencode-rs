@@ -5,6 +5,10 @@
     "github>trim21/renovate-config:python",
     "github>trim21/renovate-config:rust"
   ],
+  "labels": [
+    "ci:auto-merge",
+    "dependencies"
+  ],
   "lockFileMaintenance": {
     "enabled": true
   },

@@ -28,6 +28,12 @@ jobs:
       - run: cargo fmt --check --all
       - run: cargo clippy
 
+  all-ci-jobs:
+    needs: ["test", "bench-cp", "coverage", "audit"]
+    runs-on: ubuntu-slim
+    steps:
+      - run: echo 1
+
   test:
     strategy:
       matrix:
@@ -68,7 +74,7 @@ jobs:
 
       - run: pytest -sv
         env:
-          RUST_BACKTRACE: 'full'
+          RUST_BACKTRACE: "full"
 
   bench-cp:
     strategy:
@@ -104,7 +110,7 @@ jobs:
         uses: CodSpeedHQ/action@v4
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
-          mode: 'instrumentation'
+          mode: "instrumentation"
           run: python -m pytest tests/bench.py --codspeed
 
   audit:
@@ -134,7 +140,6 @@ jobs:
 
       - run: abi3audit --verbose dist/*.whl
       - run: twine check --strict dist/*
-
 
   coverage:
     name: Coverage for ${{ matrix.python-version }}
@@ -185,4 +190,4 @@ jobs:
       - uses: codecov/codecov-action@v5
         with:
           files: coverage.lcov
-          token: '${{ secrets.CODECOV_TOKEN }}'
+          token: "${{ secrets.CODECOV_TOKEN }}"
