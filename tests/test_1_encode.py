@@ -57,6 +57,11 @@ def test_exception_when_strict():
         bencode(invalid_obj)
 
 
+def test_encode_buffer_non_contiguous_memoryview():
+    mv = memoryview(b"abcdef")[::2]
+    assert bencode(mv) == b"3:ace"
+
+
 def test_encode():
     assert bencode(
         {
