@@ -1,12 +1,13 @@
 use bytes::BufMut;
+use pyo3::buffer::{PyBuffer, ReadOnlyCell};
 use pyo3::types::PyByteArray;
+use pyo3::PyTypeCheck;
 use pyo3::{
     create_exception,
     exceptions::PyTypeError,
     prelude::*,
     types::{PyBytes, PyDict, PyInt, PyList, PyString, PyTuple},
 };
-use pyo3::{ffi, PyTypeCheck};
 use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::collections::HashSet;
@@ -119,7 +120,7 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
     }
 
     if PyInt::type_check(value) {
-        return encode_int(ctx, py, value);
+        return encode_int(ctx, value);
     }
 
     let ptr = value.as_ptr().cast::<()>() as usize;
@@ -223,6 +224,37 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
         return Ok(());
     }
 
+    // Accept any object implementing the buffer protocol (e.g. memoryview, array, numpy).
+    // Use the high-level PyO3 buffer API (requires full API or `abi3-py311+`).
+    if let Ok(buffer) = PyBuffer::<u8>::get(value) {
+        if let Some(slice) = buffer.as_slice(py) {
+            let len = slice.len();
+            ctx.write_int(len)?;
+            ctx.buf.put_u8(b':');
+
+            debug_assert_eq!(std::mem::size_of::<ReadOnlyCell<u8>>(), 1);
+            debug_assert_eq!(std::mem::align_of::<ReadOnlyCell<u8>>(), 1);
+
+            let start = ctx.buf.len();
+            ctx.buf.reserve(len);
+            unsafe {
+                ctx.buf.set_len(start + len);
+                std::ptr::copy_nonoverlapping(
+                    slice.as_ptr().cast::<u8>(),
+                    ctx.buf.as_mut_ptr().add(start),
+                    len,
+                );
+            }
+            return Ok(());
+        }
+
+        let bytes = buffer.to_vec(py)?;
+        ctx.write_int(bytes.len())?;
+        ctx.buf.put_u8(b':');
+        ctx.buf.put(bytes.as_slice());
+        return Ok(());
+    }
+
     let typ = value.get_type();
     let name = typ.name()?;
 
@@ -238,19 +270,7 @@ fn __encode_str(v: &[u8], ctx: &mut Context) -> PyResult<()> {
     Ok(())
 }
 
-struct AutoFree {
-    pub ptr: *mut ffi::PyObject,
-}
-
-impl Drop for AutoFree {
-    fn drop(&mut self) {
-        unsafe {
-            ffi::Py_DecRef(self.ptr);
-        }
-    }
-}
-
-fn encode_int<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>) -> PyResult<()> {
+fn encode_int<'py>(ctx: &mut Context, value: &Bound<'py, PyAny>) -> PyResult<()> {
     let v = unsafe { value.cast_unchecked::<PyInt>() };
 
     if let Ok(v) = v.extract::<i64>() {
@@ -261,28 +281,12 @@ fn encode_int<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
         return Ok(());
     }
 
+    // Slow path for big ints: use Python's string conversion.
+    let as_int = value.call_method0("__int__")?;
     ctx.buf.put_u8(b'i');
-
-    unsafe {
-        let i = ffi::PyNumber_Long(value.as_ptr());
-        if i.is_null() {
-            return Err(PyErr::fetch(py));
-        }
-
-        let o = AutoFree { ptr: i };
-        let s = ffi::PyObject_Str(o.ptr);
-        if s.is_null() {
-            return Err(PyErr::fetch(py));
-        }
-
-        let ss = Bound::<PyAny>::from_owned_ptr(py, s);
-
-        let s = ss.cast_unchecked::<PyString>();
-        ctx.buf.put(s.to_str()?.as_bytes());
-    };
-
+    let s = as_int.str()?;
+    ctx.buf.put(s.to_str()?.as_bytes());
     ctx.buf.put_u8(b'e');
-
     Ok(())
 }
 

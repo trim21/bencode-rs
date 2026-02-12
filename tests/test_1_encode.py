@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import array
 import collections
 import dataclasses
 import enum
@@ -28,7 +29,8 @@ from bencode_rs import BencodeEncodeError, bencode
         (18446744073709551616, b"i18446744073709551616e"),  # unsigned long long +1
         (4927586304, b"i4927586304e"),
         (bytearray([1, 2, 3]), b"3:\x01\x02\x03"),
-        # (memoryview(b"\x01\x02\x03"), b"3:\x01\x02\x03"),
+        (memoryview(b"\x01\x02\x03"), b"3:\x01\x02\x03"),
+        (array.array("B", [1, 2, 3]), b"3:\x01\x02\x03"),
         ("你好", b"6:" + "你好".encode()),
         ("\U0001f600", b"4:\xf0\x9f\x98\x80"),
         ([b"spam", b"eggs"], b"l4:spam4:eggse"),
