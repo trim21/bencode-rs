@@ -9,12 +9,12 @@ on:
     branches:
       - master
     tags-ignore:
-      - "*"
+      - '*'
 
 jobs:
   build:
     concurrency:
-      group: "${{ github.workflow }}-${{ github.ref }}"
+      group: '${{ github.workflow }}-${{ github.ref }}'
       cancel-in-progress: true
     uses: ./.github/workflows/_build_wheels.yaml
 
@@ -28,24 +28,18 @@ jobs:
       - run: cargo fmt --check --all
       - run: cargo clippy
 
-  all-ci-jobs:
-    needs: ["test", "bench-cp", "coverage", "audit"]
-    runs-on: ubuntu-slim
-    steps:
-      - run: echo 1
-
   test:
     strategy:
       matrix:
-        os: ["ubuntu-24.04", "macos-15", "windows-latest"]
+        os: ['ubuntu-24.04', 'macos-15', 'windows-latest']
         python-version:
-          - "3.10"
-          - "3.11"
-          - "3.12"
-          - "3.13"
-          - "3.14"
+          - '3.10'
+          - '3.11'
+          - '3.12'
+          - '3.13'
+          - '3.14'
 
-    runs-on: "${{ matrix.os }}"
+    runs-on: '${{ matrix.os }}'
 
     needs: [build]
 
@@ -74,15 +68,15 @@ jobs:
 
       - run: pytest -sv
         env:
-          RUST_BACKTRACE: "full"
+          RUST_BACKTRACE: 'full'
 
   bench-cp:
     strategy:
       matrix:
         python-version:
-          - "3.12"
+          - '3.10'
 
-    runs-on: "ubuntu-24.04"
+    runs-on: 'ubuntu-24.04'
 
     steps:
       - uses: actions/checkout@v6
@@ -110,7 +104,7 @@ jobs:
         uses: CodSpeedHQ/action@v4
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
-          mode: "simulation"
+          mode: 'instrumentation'
           run: python -m pytest tests/bench.py --codspeed
 
   audit:
@@ -123,7 +117,7 @@ jobs:
       - name: Set up Python 3.14.2
         uses: actions/setup-python@v6
         with:
-          python-version: "3.14.3"
+          python-version: '3.14.2'
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -138,7 +132,7 @@ jobs:
           name: wheel
           path: dist
 
-      - run: abi3audit --verbose dist/*abi3*.whl
+      - run: abi3audit --verbose dist/*.whl
       - run: twine check --strict dist/*
 
   coverage:
@@ -146,11 +140,11 @@ jobs:
     strategy:
       matrix:
         python-version:
-          - "3.10"
-          - "3.11"
-          - "3.12"
-          - "3.13"
-          - "3.14"
+          - '3.10'
+          - '3.11'
+          - '3.12'
+          - '3.13'
+          - '3.14'
 
     runs-on: ubuntu-24.04
     steps:
@@ -158,7 +152,7 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v6
         with:
-          python-version: "${{ matrix.python-version }}"
+          python-version: '${{ matrix.python-version }}'
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -183,15 +177,11 @@ jobs:
           set -euxo pipefail
           source <(cargo llvm-cov show-env --export-prefix)
           export CARGO_TARGET_DIR=$CARGO_LLVM_COV_TARGET_DIR
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then
-            maturin develop --uv --no-default-features
-          else
-            maturin develop --uv
-          fi
+          maturin develop --uv
           pytest tests
           cargo llvm-cov report --lcov --output-path coverage.lcov
 
       - uses: codecov/codecov-action@v5
         with:
           files: coverage.lcov
-          token: "${{ secrets.CODECOV_TOKEN }}"
+          token: '${{ secrets.CODECOV_TOKEN }}'

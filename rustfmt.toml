@@ -5,8 +5,8 @@ use_field_init_shorthand = true
 
 # nigntly
 
-#imports_granularity = 'Module'
-#group_imports = 'StdExternalCrate'
-#imports_layout = "HorizontalVertical"
-#force_multiline_blocks = true
-#trailing_comma = 'Always'
+# imports_granularity = 'Module'
+# group_imports = 'StdExternalCrate'
+# imports_layout = "HorizontalVertical"
+# force_multiline_blocks = true
+# trailing_comma = 'Always'
