@@ -14,7 +14,9 @@ pull_request_rules:
           - '#approved-reviews-by>=1'
           - label=ci:auto-merge
       - or:
-          - head!=renovate/lock-file-maintenance
+          - not:
+              and:
+                - 'head*=renovate/lockfile-maintenance-*'
           - 'created-at<=24h ago'
       - base=master
       - check-success=cargo-fmt
