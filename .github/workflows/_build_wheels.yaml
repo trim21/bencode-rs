@@ -11,7 +11,7 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v6
         with:
-          python-version: "3.14.3"
+          python-version: '3.14.3'
       - name: Build sdist
         uses: PyO3/maturin-action@v1
         with:
@@ -71,7 +71,7 @@ jobs:
         if: ${{ runner.os != 'Linux' }}
         with:
           # Build the abi3 wheel using a Python >= 3.11 interpreter.
-          python-version: "3.14.3"
+          python-version: '3.14.3'
           architecture: ${{ matrix.platform.py }}
 
       - name: Build wheels (abi3, py>=3.11)
@@ -79,13 +79,13 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist
-          sccache: "true"
+          sccache: 'true'
           manylinux: ${{ matrix.platform.manylinux }}
 
       - uses: actions/setup-python@v6
         if: ${{ runner.os != 'Linux' }}
         with:
-          python-version: "3.10"
+          python-version: '3.10'
           architecture: ${{ matrix.platform.py }}
 
       - name: Build wheels (cp310, non-abi3)
@@ -94,7 +94,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --interpreter python3.10 --no-default-features
-          sccache: "true"
+          sccache: 'true'
           manylinux: ${{ matrix.platform.manylinux }}
 
       - name: Build wheels (cp310, non-abi3)
@@ -103,7 +103,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --interpreter python --no-default-features
-          sccache: "true"
+          sccache: 'true'
           manylinux: ${{ matrix.platform.manylinux }}
 
       - name: Upload wheels
@@ -114,7 +114,7 @@ jobs:
 
   merge-wheel-artifact:
     runs-on: ubuntu-24.04
-    needs: ["sdist", "wheel"]
+    needs: ['sdist', 'wheel']
     steps:
       - name: Merge Artifacts
         uses: actions/upload-artifact/merge@v6
