@@ -89,20 +89,11 @@ jobs:
           architecture: ${{ matrix.platform.py }}
 
       - name: Build wheels (cp310, non-abi3)
-        if: ${{ runner.os == 'Linux' }}
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.platform.target }}
-          args: --release --out dist --interpreter python3.10 --no-default-features
-          sccache: 'true'
-          manylinux: ${{ matrix.platform.manylinux }}
-
-      - name: Build wheels (cp310, non-abi3)
         if: ${{ runner.os != 'Linux' }}
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist --interpreter python --no-default-features
+          args: --release --out dist --interpreter python python3.10
           sccache: 'true'
           manylinux: ${{ matrix.platform.manylinux }}
 
