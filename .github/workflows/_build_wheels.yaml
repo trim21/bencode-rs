@@ -87,6 +87,9 @@ jobs:
           sccache: 'true'
           manylinux: ${{ matrix.platform.manylinux }}
 
+      - run: ls -ahl dist
+        shell: bash
+
       - name: Upload wheels
         uses: actions/upload-artifact@v6
         with:
