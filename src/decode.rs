@@ -152,13 +152,11 @@ impl<'a> Decoder<'a> {
                 num_start += 1;
                 sign = -1;
             }
-            b'0' => {
-                if self.index + 1 != index_e {
-                    return Err(DecodeError::new_err(format!(
-                        "invalid int, non-zero int should not start with '0'. found at {}",
-                        self.index
-                    )));
-                }
+            b'0' if self.index + 1 != index_e => {
+                return Err(DecodeError::new_err(format!(
+                    "invalid int, non-zero int should not start with '0'. found at {}",
+                    self.index
+                )));
             }
             _ => {}
         }
