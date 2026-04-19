@@ -1,3 +1,12 @@
+merge_queue:
+  max_parallel_checks: 1
+  queued_label: 'ci:queued'
+  dequeued_label: 'ci:dequeued'
+
+queue_rules:
+  - name: renovate
+    update_method: merge
+
 pull_request_rules:
   - name: label conflicts
     conditions:
@@ -9,7 +18,6 @@ pull_request_rules:
 
   - name: Automatic merge on approval
     conditions:
-      - '#commits-behind=0'
       - or:
           - '#approved-reviews-by>=1'
           - label=ci:auto-merge
@@ -22,5 +30,5 @@ pull_request_rules:
       - check-success=cargo-fmt
       - check-success=all-ci-jobs
     actions:
-      merge:
-        method: squash
+      queue:
+        name: renovate
