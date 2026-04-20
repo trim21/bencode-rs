@@ -338,7 +338,7 @@ fn encode_dict<'py>(ctx: &mut Context, py: Python<'py>, v: &Bound<'py, PyDict>) 
             continue;
         }
 
-        let typ = value.get_type();
+        let typ = key.get_type();
         let name = typ.name()?;
 
         return Err(PyTypeError::new_err(format!(

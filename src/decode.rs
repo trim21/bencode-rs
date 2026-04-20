@@ -38,7 +38,7 @@ pub fn bdecode(b: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
             if ctx.index != size {
                 return Err(DecodeError::new_err(format!(
                     "invalid bencode data, top level value end at index {} but total bytes length {}",
-                    ctx.index+1, size
+                    ctx.index, size
                 )));
             }
             Ok(object)
@@ -143,6 +143,12 @@ impl<'a> Decoder<'a> {
 
         match self.bytes[self.index] {
             b'-' => {
+                if self.index + 1 >= index_e {
+                    return Err(DecodeError::new_err(format!(
+                        "invalid int, no digits after '-' at {}",
+                        self.index
+                    )));
+                }
                 if self.bytes[self.index + 1] == b'0' {
                     return Err(DecodeError::new_err(format!(
                         "invalid int, '-0' found at {}",
