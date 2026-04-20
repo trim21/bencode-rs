@@ -68,7 +68,7 @@ dev = [
 [package.metadata.requires-dev]
 dev = [
     { name = "abi3audit", specifier = ">=0.0.26,<1.0" },
-    { name = "maturin", specifier = ">=1.12.6,<2.0" },
+    { name = "maturin", specifier = ">=1.12.6,<1.13.0" },
     { name = "pytest", specifier = ">=9.0.3,<9.1" },
     { name = "pytest-codspeed", specifier = "==4.4.0" },
     { name = "pytest-github-actions-annotate-failures", specifier = "==0.4.0" },
