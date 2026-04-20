@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "bencode-rs"
-version = "0.0.8"
+version = "0.0.9"
 requires-python = ">=3.10"
 description = "a bencode parser build with pyo3"
 readme = "readme.md"
@@ -40,8 +40,8 @@ dev = [
 [tool.maturin]
 module-name = "bencode_rs._bencode"
 python-source = "py"
+# we need PyBuffer which is stable since 3.11
 features = [
-  # we need PyBuffer which is stable since 3.11
   { feature = "pyo3/abi3-py311", python-version = ">=3.11" },
 ]
 
