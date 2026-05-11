@@ -11,7 +11,7 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v6
         with:
-          python-version: '3.14.4'
+          python-version: '3.14.5'
       - name: Build sdist
         uses: PyO3/maturin-action@v1
         with:
