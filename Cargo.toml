@@ -14,4 +14,4 @@ default = []
 bytes = "1.11.1"
 num = "0.4.3"
 pyo3 = { version = "0.29.0", features = ['generate-import-lib'] }
-smallvec = "1.15.1"
+smallvec = "1.15.2"
