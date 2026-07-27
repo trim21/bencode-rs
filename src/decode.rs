@@ -104,10 +104,7 @@ impl<'a> Decoder<'a> {
                 .checked_mul(10)
                 .and_then(|v| v.checked_add(digit))
                 .ok_or_else(|| {
-                    DecodeError::new_err(format!(
-                        "bytes length overflow at index {}",
-                        self.index
-                    ))
+                    DecodeError::new_err(format!("bytes length overflow at index {}", self.index))
                 })?;
         }
 
