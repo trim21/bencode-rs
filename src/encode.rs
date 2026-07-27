@@ -98,15 +98,33 @@ impl Context {
 }
 
 fn is_dataclass<'py>(py: Python<'py>, obj: &Bound<'py, PyAny>) -> PyResult<bool> {
-    let result = py
-        .import("dataclasses")?
-        .getattr("is_dataclass")?
-        .call1((obj,))?;
+    use std::sync::OnceLock;
+    static IS_DATACLASS: OnceLock<Py<PyAny>> = OnceLock::new();
+    let func = match IS_DATACLASS.get() {
+        Some(f) => f.bind(py).clone(),
+        None => {
+            let f = py.import("dataclasses")?.getattr("is_dataclass")?.unbind();
+            // Racing writes are harmless: same fn object for every winner.
+            let _ = IS_DATACLASS.set(f.clone_ref(py));
+            f.into_bound(py)
+        }
+    };
+    let result = func.call1((obj,))?;
     result.extract::<bool>()
 }
 
 fn get_dataclass_fields_func(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
-    py.import("dataclasses")?.getattr("fields")
+    use std::sync::OnceLock;
+    static FIELDS: OnceLock<Py<PyAny>> = OnceLock::new();
+    let func = match FIELDS.get() {
+        Some(f) => f.bind(py).clone(),
+        None => {
+            let f = py.import("dataclasses")?.getattr("fields")?.unbind();
+            let _ = FIELDS.set(f.clone_ref(py));
+            f.into_bound(py)
+        }
+    };
+    Ok(func)
 }
 
 fn encode_dataclasses<'py>(

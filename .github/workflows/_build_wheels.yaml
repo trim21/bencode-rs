@@ -84,7 +84,6 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --interpreter '3.11' --interpreter '3.10'
-          sccache: 'true'
           manylinux: ${{ matrix.platform.manylinux }}
 
       - run: ls -ahl dist
