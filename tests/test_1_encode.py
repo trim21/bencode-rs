@@ -160,6 +160,18 @@ def test_dataclasses():
 
     o = Obj(b=1, a="1", d=True, c=[{}, {"a": 1}])
 
+    # DIAGNOSTIC: check what the C extension sees
+    from bencode_rs._bencode import _debug_dataclass
+
+    is_dc, mod_name, func_repr = _debug_dataclass(o)
+    print(f"\nDATACLASS DEBUG: is_dataclass={is_dc}, module={mod_name}, func={func_repr}", flush=True)
+
+    # Also check that Python-side is_dataclass agrees
+    py_is_dc = dataclasses.is_dataclass(o)
+    print(f"Python is_dataclass: {py_is_dc}", flush=True)
+
+    assert is_dc, f"C-side is_dataclass returned {is_dc} (Python side says {py_is_dc})"
+
     assert (
         bencode(o)
         == bencode(dataclasses.asdict(o))
