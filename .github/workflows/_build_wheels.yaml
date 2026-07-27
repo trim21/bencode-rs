@@ -67,11 +67,6 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         if: ${{ runner.os != 'Linux' }}
         with:
-          cache: false
-
-      - uses: Swatinem/rust-cache@v2
-        if: ${{ runner.os != 'Linux' }}
-        with:
           cache-targets: false
 
       - uses: actions/setup-python@v7
