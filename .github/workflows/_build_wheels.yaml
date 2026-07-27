@@ -91,8 +91,14 @@ jobs:
       - run: ls -ahl dist
         shell: bash
 
-      - run: shasum -a 256 dist/*.whl
-        shell: bash
+      - shell: bash
+        run: |
+          python3 -c "
+          import hashlib, glob
+          for f in sorted(glob.glob('dist/*.whl')):
+              h = hashlib.sha256(open(f, 'rb').read()).hexdigest()
+              print(f'{h}  {f}')
+          "
 
       - name: Upload wheels
         uses: actions/upload-artifact@v7
