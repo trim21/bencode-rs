@@ -97,6 +97,61 @@ impl Context {
     }
 }
 
+static IS_DATACLASS: std::sync::OnceLock<Py<PyAny>> = std::sync::OnceLock::new();
+static DATACLASS_FIELDS: std::sync::OnceLock<Py<PyAny>> = std::sync::OnceLock::new();
+
+pub fn init(py: Python<'_>) -> PyResult<()> {
+    let m = py.import("dataclasses")?;
+    let _ = IS_DATACLASS.set(m.getattr("is_dataclass")?.unbind());
+    let _ = DATACLASS_FIELDS.set(m.getattr("fields")?.unbind());
+    Ok(())
+}
+
+fn is_dataclass<'py>(py: Python<'py>, obj: &Bound<'py, PyAny>) -> PyResult<bool> {
+    // SAFETY: init() is called at module load before any encode call.
+    let func = IS_DATACLASS.get().unwrap().bind(py).clone();
+    let result = func.call1((obj,))?;
+    result.extract::<bool>()
+}
+
+fn get_dataclass_fields_func(py: Python<'_>) -> Bound<'_, PyAny> {
+    // SAFETY: init() is called at module load before any encode call.
+    DATACLASS_FIELDS.get().unwrap().bind(py).clone()
+}
+
+fn encode_dataclasses<'py>(
+    ctx: &mut Context,
+    py: Python<'py>,
+    value: &Bound<'py, PyAny>,
+) -> PyResult<()> {
+    ctx.buf.put_u8(b'd');
+
+    let fields_func = get_dataclass_fields_func(py);
+    let fields = fields_func.call1((value,))?;
+
+    #[allow(clippy::type_complexity)]
+    let mut sv: SmallVec<[(Cow<[u8]>, Bound<'_, PyAny>); 8]> = SmallVec::new();
+
+    for field in fields.try_iter()? {
+        let field = field?;
+        let key_name = field.getattr("name")?;
+        let key_s = key_name.extract::<&str>()?;
+        let field_value = value.getattr(key_s)?;
+        sv.push((Cow::Owned(key_s.as_bytes().to_vec()), field_value));
+    }
+
+    sv.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+
+    for (key, field_value) in sv {
+        __encode_str(&key, ctx)?;
+        encode_any(ctx, py, &field_value.into_any())?;
+    }
+
+    ctx.buf.put_u8(b'e');
+
+    Ok(())
+}
+
 fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>) -> PyResult<()> {
     if PyString::type_check(value) {
         let s = unsafe { value.cast_unchecked::<PyString>() };
@@ -184,6 +239,33 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
         ctx.buf.put_u8(b':');
         ctx.buf.put(bytes.as_slice());
         return Ok(());
+    }
+
+    // dataclasses support: check before raising "Unsupported type"
+    if is_dataclass(py, value)? {
+        ctx.stack_depth += 1;
+        let checked = ctx.stack_depth >= 100;
+        let ptr = value.as_ptr().cast::<()>() as usize;
+
+        if checked {
+            if ctx.seen.contains(&ptr) {
+                ctx.stack_depth -= 1;
+                let repr = value.repr()?.to_string();
+                return Err(BencodeEncodeError::new_err(format!(
+                    "circular reference found: {repr}"
+                )));
+            }
+            ctx.seen.insert(ptr);
+        }
+
+        let result = encode_dataclasses(ctx, py, value);
+
+        if checked {
+            ctx.seen.remove(&ptr);
+        }
+        ctx.stack_depth -= 1;
+
+        return result;
     }
 
     let typ = value.get_type();

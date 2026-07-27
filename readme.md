@@ -18,9 +18,28 @@ assert bencode_rs.bencode({'hello': 'world'}) == b'd5:hello5:worlde'
 
 ## Notice
 
-### decoding
-there is no str/string in bencode, only bytes.
-so we decode bencode bytes to python bytes, since it may not be a utf8 string.
+### Decoding
 
-### encoding
-we encode python `True` as int `1` and `False` as int 0.
+| bencode type | python type |
+| :----------: | :---------: |
+|   integer    |    `int`    |
+|    string    |   `bytes`   |
+|    array     |   `list`    |
+|  dictionary  |   `dict`    |
+
+bencode has no string type, only bytes.
+so we decode bencode bytes to python `bytes`, since it may not be a utf-8 string.
+
+### Encoding
+
+|            python type            | bencode type |
+| :-------------------------------: | :----------: |
+|              `bool`               | integer 0/1  |
+|       `int`, `enum.IntEnum`       |   integer    |
+|       `str`, `enum.StrEnum`       |    string    |
+| `bytes`, `bytearray`,`memoryview` |    string    |
+|   `list`, `tuple`, `NamedTuple`   |    array     |
+|       `dict`, `OrderedDict`       |  dictionary  |
+|            dataclasses            |  dictionary  |
+
+Also, we encode python `True` as int `1` and `False` as int 0.
