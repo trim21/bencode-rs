@@ -99,22 +99,31 @@ impl<'a> Decoder<'a> {
                     c, self.index
                 )));
             }
-            len = len * 10 + (c - b'0') as usize;
+            let digit = (c - b'0') as usize;
+            len = len
+                .checked_mul(10)
+                .and_then(|v| v.checked_add(digit))
+                .ok_or_else(|| {
+                    DecodeError::new_err(format!(
+                        "bytes length overflow at index {}",
+                        self.index
+                    ))
+                })?;
         }
 
         let bytes_start: usize = index_sep + 1;
-        let bytes_end: usize = bytes_start + len - 1;
+        let bytes_end: usize = bytes_start + len;
 
-        if bytes_end >= self.bytes.len() {
+        if bytes_end > self.bytes.len() {
             return Err(DecodeError::new_err(format!(
                 "invalid bytes length, buffer overflow to {}: index {}, len {}",
                 bytes_end, self.index, len
             )));
         }
 
-        self.index = bytes_end + 1;
+        self.index = bytes_end;
 
-        let str_buff: &[u8] = self.bytes[bytes_start..=bytes_end].as_ref();
+        let str_buff: &[u8] = &self.bytes[bytes_start..bytes_end];
 
         Ok(str_buff)
     }

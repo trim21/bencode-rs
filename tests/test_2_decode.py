@@ -92,3 +92,24 @@ def test_decode1():
         b"t": b"aa",
         b"y": b"q",
     }
+
+
+def test_decode_bytes_length_overflow():
+    """length value that would overflow usize should raise DecodeError, not panic or wrap."""
+    # A very large length that exceeds any reasonable usize
+    with pytest.raises(BencodeDecodeError):
+        bdecode(b"99999999999999999999:abc")
+    # 18446744073709551616 is usize::MAX + 1 on 64-bit
+    with pytest.raises(BencodeDecodeError):
+        bdecode(b"18446744073709551616:abc")
+
+
+def test_decode_zero_length_bytes():
+    """zero-length byte string should decode to empty bytes."""
+    assert bdecode(b"0:") == b""
+
+
+def test_decode_int_no_digits_after_sign():
+    """'i-e' should raise DecodeError, not silently return 0."""
+    with pytest.raises(BencodeDecodeError):
+        bdecode(b"i-e")

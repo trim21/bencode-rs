@@ -248,3 +248,34 @@ def test_NamedTuple():
         v: str
 
     assert bencode(UserNamedTuple(v="s")) == b"l1:se"
+
+
+def test_many_nested_structs_no_false_circular():
+    """The stack_depth counter should properly track recursion depth,
+    not accumulate across sibling encodings. Encoding many moderately
+    nested structs should not trigger circular reference detection."""
+    # Encode many nested lists sequentially; none is circular
+    nested = [1]
+    for _ in range(20):
+        nested = [nested]
+    for _ in range(50):
+        bencode(nested)
+
+    # Encode many nested dicts sequentially
+    nested = {"k": 1}
+    for _ in range(20):
+        nested = {"inner": nested}
+    for _ in range(50):
+        bencode(nested)
+
+
+def test_dict_key_types():
+    """str and bytes keys are supported; other types are rejected."""
+    assert bencode({"hello": 1}) == b"d5:helloi1ee"
+    assert bencode({b"hello": 1}) == b"d5:helloi1ee"
+    with pytest.raises(TypeError):
+        bencode({1: 2})  # int key not allowed
+    with pytest.raises(TypeError):
+        bencode({True: 2})  # bool key not allowed
+    with pytest.raises(TypeError):
+        bencode({(1,): 2})  # tuple key not allowed
