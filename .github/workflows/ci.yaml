@@ -79,7 +79,7 @@ jobs:
               print(f'{h}  {f}')
           "
 
-      - run: uv pip install --no-cache bencode-rs --no-index --find-links ./dist/
+      - run: uv pip install --no-cache --reinstall bencode-rs --no-index --find-links ./dist/ -vv
 
       - run: pytest -sv
         env:
