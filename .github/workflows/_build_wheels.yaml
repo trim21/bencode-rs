@@ -81,7 +81,7 @@ jobs:
           python-version: '3.11'
           architecture: ${{ matrix.platform.py }}
 
-      - name: Build wheels (cp310, non-abi3)
+      - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
@@ -89,6 +89,9 @@ jobs:
           manylinux: ${{ matrix.platform.manylinux }}
 
       - run: ls -ahl dist
+        shell: bash
+
+      - run: shasum -a 256 dist/*.whl
         shell: bash
 
       - name: Upload wheels
