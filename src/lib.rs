@@ -19,5 +19,6 @@ fn _bencode(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
         "BencodeDecodeError",
         py.get_type::<decode::BencodeDecodeError>(),
     )?;
+    encode::init(py)?;
     Ok(())
 }

@@ -97,32 +97,26 @@ impl Context {
     }
 }
 
+static IS_DATACLASS: std::sync::OnceLock<Py<PyAny>> = std::sync::OnceLock::new();
+static DATACLASS_FIELDS: std::sync::OnceLock<Py<PyAny>> = std::sync::OnceLock::new();
+
+pub fn init(py: Python<'_>) -> PyResult<()> {
+    let m = py.import("dataclasses")?;
+    let _ = IS_DATACLASS.set(m.getattr("is_dataclass")?.unbind());
+    let _ = DATACLASS_FIELDS.set(m.getattr("fields")?.unbind());
+    Ok(())
+}
+
 fn is_dataclass<'py>(py: Python<'py>, obj: &Bound<'py, PyAny>) -> PyResult<bool> {
-    use std::sync::OnceLock;
-    static IS_DATACLASS: OnceLock<Py<PyAny>> = OnceLock::new();
-    let func = if let Some(f) = IS_DATACLASS.get() {
-        f.bind(py).clone()
-    } else {
-        let f = py.import("dataclasses")?.getattr("is_dataclass")?.unbind();
-        // Racing writes are harmless: same fn object for every winner.
-        let _ = IS_DATACLASS.set(f.clone_ref(py));
-        f.into_bound(py)
-    };
+    // SAFETY: init() is called at module load before any encode call.
+    let func = IS_DATACLASS.get().unwrap().bind(py).clone();
     let result = func.call1((obj,))?;
     result.extract::<bool>()
 }
 
-fn get_dataclass_fields_func(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
-    use std::sync::OnceLock;
-    static FIELDS: OnceLock<Py<PyAny>> = OnceLock::new();
-    let func = if let Some(f) = FIELDS.get() {
-        f.bind(py).clone()
-    } else {
-        let f = py.import("dataclasses")?.getattr("fields")?.unbind();
-        let _ = FIELDS.set(f.clone_ref(py));
-        f.into_bound(py)
-    };
-    Ok(func)
+fn get_dataclass_fields_func(py: Python<'_>) -> Bound<'_, PyAny> {
+    // SAFETY: init() is called at module load before any encode call.
+    DATACLASS_FIELDS.get().unwrap().bind(py).clone()
 }
 
 fn encode_dataclasses<'py>(
@@ -132,7 +126,7 @@ fn encode_dataclasses<'py>(
 ) -> PyResult<()> {
     ctx.buf.put_u8(b'd');
 
-    let fields_func = get_dataclass_fields_func(py)?;
+    let fields_func = get_dataclass_fields_func(py);
     let fields = fields_func.call1((value,))?;
 
     #[allow(clippy::type_complexity)]
