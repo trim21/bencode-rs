@@ -40,7 +40,6 @@ so we decode bencode bytes to python `bytes`, since it may not be a utf-8 string
 | `bytes`, `bytearray`,`memoryview` |    string    |
 |   `list`, `tuple`, `NamedTuple`   |    array     |
 |       `dict`, `OrderedDict`       |  dictionary  |
-|       `types.MappingProxy`        |  dictionary  |
 |            dataclasses            |  dictionary  |
 
 Also, we encode python `True` as int `1` and `False` as int 0.
