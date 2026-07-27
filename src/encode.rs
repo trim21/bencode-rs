@@ -131,6 +131,7 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
 
         if checked {
             if ctx.seen.contains(&ptr) {
+                ctx.stack_depth -= 1;
                 let repr = value.repr()?.to_string();
                 return Err(BencodeEncodeError::new_err(format!(
                     "circular reference found: {repr}"
@@ -139,15 +140,14 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
             ctx.seen.insert(ptr);
         }
 
-        unsafe {
-            encode_dict(ctx, py, value.cast_unchecked())?;
-        }
+        let result = unsafe { encode_dict(ctx, py, value.cast_unchecked()) };
 
         if checked {
             ctx.seen.remove(&ptr);
         }
+        ctx.stack_depth -= 1;
 
-        return Ok(());
+        return result;
     }
 
     if PyList::type_check(value) {
@@ -244,6 +244,7 @@ fn encode_list<'py>(
 
     if checked {
         if ctx.seen.contains(&ptr) {
+            ctx.stack_depth -= 1;
             let repr = value.repr()?.to_string();
             return Err(BencodeEncodeError::new_err(format!(
                 "circular reference found: {repr}"
@@ -265,6 +266,7 @@ fn encode_list<'py>(
     if checked {
         ctx.seen.remove(&ptr);
     }
+    ctx.stack_depth -= 1;
 
     Ok(())
 }
@@ -280,6 +282,7 @@ fn encode_tuple<'py>(
 
     if checked {
         if ctx.seen.contains(&ptr) {
+            ctx.stack_depth -= 1;
             let repr = value.repr()?.to_string();
             return Err(BencodeEncodeError::new_err(format!(
                 "circular reference found: {repr}"
@@ -301,6 +304,7 @@ fn encode_tuple<'py>(
     if checked {
         ctx.seen.remove(&ptr);
     }
+    ctx.stack_depth -= 1;
 
     Ok(())
 }
@@ -313,28 +317,12 @@ fn encode_dict<'py>(ctx: &mut Context, py: Python<'py>, v: &Bound<'py, PyDict>) 
 
     for (key, value) in v.iter() {
         if let Ok(s) = key.extract::<&str>() {
-            unsafe {
-                // d.as_bytes() return a &[u8] and doesn't live longer than variable `key`,
-                // but it's not true, &[u8] lives as long as python ptr lives,
-                // which is longer than variable `key` and we do not need to drop it.
-                sv.push((
-                    Cow::from(std::mem::transmute::<&[u8], &'py [u8]>(s.as_bytes())),
-                    value,
-                ));
-            }
+            sv.push((Cow::Owned(s.as_bytes().to_vec()), value));
             continue;
         }
 
         if let Ok(b) = key.cast::<PyBytes>() {
-            unsafe {
-                // d.as_bytes() return a &[u8] and doesn't live longer than variable `key`,
-                // but it's not true, &[u8] lives as long as python ptr lives,
-                // which is longer than variable `key` and we do not need to drop it.
-                sv.push((
-                    Cow::from(std::mem::transmute::<&[u8], &'py [u8]>(b.as_bytes())),
-                    value,
-                ));
-            }
+            sv.push((Cow::Owned(b.as_bytes().to_vec()), value));
             continue;
         }
 
@@ -348,18 +336,14 @@ fn encode_dict<'py>(ctx: &mut Context, py: Python<'py>, v: &Bound<'py, PyDict>) 
 
     sv.sort_unstable_by(|a, b| a.0.cmp(&b.0));
 
-    let mut last_key: Option<Cow<[u8]>> = None;
-    for (key, _) in sv.clone() {
-        if let Some(lk) = last_key {
-            if lk == key {
-                return Err(EncodeError::new_err(format!(
-                    "Duplicated keys {}",
-                    String::from_utf8(lk.into())?
-                )));
-            }
+    // Check for duplicate keys after sorting
+    for i in 1..sv.len() {
+        if sv[i - 1].0 == sv[i].0 {
+            return Err(EncodeError::new_err(format!(
+                "Duplicated keys {}",
+                String::from_utf8(sv[i].0.to_vec())?
+            )));
         }
-
-        last_key = Some(key);
     }
 
     for (key, value) in sv {
