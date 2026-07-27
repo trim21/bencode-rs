@@ -10,7 +10,6 @@ use pyo3::prelude::*;
 #[pymodule()]
 fn _bencode(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(encode::bencode, m)?)?;
-    m.add_function(wrap_pyfunction!(encode::_debug_dataclass, m)?)?;
     m.add_function(wrap_pyfunction!(decode::bdecode, m)?)?;
     m.add(
         "BencodeEncodeError",

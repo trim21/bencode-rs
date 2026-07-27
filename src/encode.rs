@@ -114,22 +114,6 @@ fn is_dataclass<'py>(py: Python<'py>, obj: &Bound<'py, PyAny>) -> PyResult<bool>
     result.extract::<bool>()
 }
 
-/// Debug helper: returns `(is_dataclass_result, module_name, func_repr)` for the given object.
-/// Used for CI diagnostics.
-#[pyfunction]
-pub fn _debug_dataclass<'py>(
-    py: Python<'py>,
-    obj: &Bound<'py, PyAny>,
-) -> PyResult<(bool, String, String)> {
-    let func = IS_DATACLASS.get().unwrap().bind(py).clone();
-    let result: bool = func.call1((obj,))?.extract()?;
-    let module_name: String = func.getattr("__module__")?.extract()?;
-    let module = py.import("dataclasses")?;
-    let is_same = module.getattr("is_dataclass")?.is(&func);
-    let func_repr = format!("module={module_name}, same_as_reimport={is_same}");
-    Ok((result, module_name, func_repr))
-}
-
 fn get_dataclass_fields_func(py: Python<'_>) -> Bound<'_, PyAny> {
     // SAFETY: init() is called at module load before any encode call.
     DATACLASS_FIELDS.get().unwrap().bind(py).clone()
