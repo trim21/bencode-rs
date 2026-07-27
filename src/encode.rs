@@ -1,6 +1,5 @@
 use bytes::BufMut;
 use pyo3::buffer::{PyBuffer, ReadOnlyCell};
-use pyo3::sync::PyOnceLock;
 use pyo3::types::PyByteArray;
 use pyo3::PyTypeCheck;
 use pyo3::{
@@ -98,19 +97,16 @@ impl Context {
     }
 }
 
-/// Cached `dataclasses.is_dataclass` function object.
-static IS_DATACLASS_FUNC: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
-/// Cached `dataclasses.fields` function object.
-static DATACLASS_FIELDS_FUNC: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
-
 fn is_dataclass<'py>(py: Python<'py>, obj: &Bound<'py, PyAny>) -> PyResult<bool> {
-    let func = IS_DATACLASS_FUNC.import(py, "dataclasses", "is_dataclass")?;
-    let result = func.call1((obj,))?;
+    let result = py
+        .import("dataclasses")?
+        .getattr("is_dataclass")?
+        .call1((obj,))?;
     result.extract::<bool>()
 }
 
-fn get_dataclass_fields_func(py: Python<'_>) -> PyResult<&Bound<'_, PyAny>> {
-    DATACLASS_FIELDS_FUNC.import(py, "dataclasses", "fields")
+fn get_dataclass_fields_func(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+    py.import("dataclasses")?.getattr("fields")
 }
 
 fn encode_dataclasses<'py>(
