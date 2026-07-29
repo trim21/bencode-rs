@@ -116,7 +116,7 @@ jobs:
       - run: uv pip install bencode-rs --no-index --find-links ./dist/
 
       - name: Run benchmarks
-        uses: CodSpeedHQ/action@v4
+        uses: CodSpeedHQ/action@v5
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
           mode: 'simulation'
