@@ -2,8 +2,7 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "github>trim21/renovate-config",
-    "github>trim21/renovate-config:python",
-    "github>trim21/renovate-config:rust"
+    "github>trim21/renovate-config:python"
   ],
   "labels": [
     "ci:auto-merge",
