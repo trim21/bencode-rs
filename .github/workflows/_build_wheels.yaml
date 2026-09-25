@@ -5,7 +5,7 @@ on:
 
 jobs:
   sdist:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
       - name: Set up Python ${{ matrix.python-version }}
@@ -105,7 +105,7 @@ jobs:
           path: dist
 
   merge-wheel-artifact:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: ['sdist', 'wheel']
     steps:
       - name: Merge Artifacts
