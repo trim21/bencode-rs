@@ -64,7 +64,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions-rust-lang/setup-rust-toolchain@v2
+      - uses: trim21/setup-rust@v0.0.2
         if: ${{ runner.os != 'Linux' }}
 
       - uses: actions/setup-python@v7
