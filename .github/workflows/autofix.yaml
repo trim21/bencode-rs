@@ -15,9 +15,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - uses: actions-rust-lang/setup-rust-toolchain@v2
-        with:
-          components: rustfmt,clippy
+      - uses: trim21/setup-rust@v0.0.2
 
       - run: cargo fmt || true
       - run: cargo clippy --fix --allow-dirty || true

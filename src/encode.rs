@@ -1,5 +1,5 @@
 use bytes::BufMut;
-use pyo3::buffer::{PyBuffer, ReadOnlyCell};
+use pyo3::buffer::PyBuffer;
 use pyo3::types::PyByteArray;
 use pyo3::PyTypeCheck;
 use pyo3::{
@@ -220,16 +220,12 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
     // Accept any object implementing the buffer protocol (e.g. memoryview, array, numpy).
     // Use the high-level PyO3 buffer API (requires full API or `abi3-py311+`).
     if let Ok(buffer) = PyBuffer::<u8>::get(value) {
-        if let Some(slice) = buffer.as_slice(py) {
-            let len = slice.len();
-            ctx.write_int(len)?;
+        if let Some(slice) = buffer.as_slice_ptr() {
+            // SAFETY: no Python code runs between reading the buffer pointer and copying the
+            // bytes out, so the buffer cannot be resized or released while the slice is alive.
+            let bytes: &[u8] = unsafe { slice.as_ref() };
+            ctx.write_int(bytes.len())?;
             ctx.buf.put_u8(b':');
-
-            debug_assert_eq!(std::mem::size_of::<ReadOnlyCell<u8>>(), 1);
-            debug_assert_eq!(std::mem::align_of::<ReadOnlyCell<u8>>(), 1);
-
-            let bytes: &[u8] =
-                unsafe { std::slice::from_raw_parts(slice.as_ptr().cast::<u8>(), len) };
             ctx.buf.extend_from_slice(bytes);
             return Ok(());
         }

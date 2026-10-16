@@ -22,14 +22,18 @@ jobs:
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
-      - uses: actions-rust-lang/setup-rust-toolchain@v2
-        with:
-          components: rustfmt,clippy
+      - uses: trim21/setup-rust@v0.0.2
       - run: cargo fmt --check --all
-      - run: cargo clippy
+
+  lint:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: trim21/setup-rust@v0.0.2
+      - run: cargo clippy --all-targets -- -D warnings
 
   all-ci-jobs:
-    needs: ['test', 'bench-cp', 'coverage', 'audit']
+    needs: ['test', 'bench-cp', 'coverage', 'audit', 'lint']
     runs-on: ubuntu-slim
     steps:
       - run: echo 1
@@ -95,7 +99,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
-      - uses: actions-rust-lang/setup-rust-toolchain@v2
+      - uses: trim21/setup-rust@v0.0.2
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v7
@@ -175,7 +179,7 @@ jobs:
           enable-cache: true
           activate-environment: true
 
-      - uses: actions-rust-lang/setup-rust-toolchain@v2
+      - uses: trim21/setup-rust@v0.0.2
         with:
           components: llvm-tools
 
