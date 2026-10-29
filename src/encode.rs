@@ -1,5 +1,6 @@
 use bytes::BufMut;
 use pyo3::buffer::PyBuffer;
+use pyo3::sync::critical_section::with_critical_section;
 use pyo3::types::PyByteArray;
 use pyo3::PyTypeCheck;
 use pyo3::{
@@ -220,21 +221,25 @@ fn encode_any<'py>(ctx: &mut Context, py: Python<'py>, value: &Bound<'py, PyAny>
     // Accept any object implementing the buffer protocol (e.g. memoryview, array, numpy).
     // Use the high-level PyO3 buffer API (requires full API or `abi3-py311+`).
     if let Ok(buffer) = PyBuffer::<u8>::get(value) {
-        if let Some(slice) = buffer.as_slice_ptr() {
-            // SAFETY: no Python code runs between reading the buffer pointer and copying the
-            // bytes out, so the buffer cannot be resized or released while the slice is alive.
-            let bytes: &[u8] = unsafe { slice.as_ref() };
+        // The critical section is what keeps another thread from resizing or mutating the
+        // buffer while its contents are copied out; on GIL builds it is a no-op.
+        return with_critical_section(value, || {
+            if let Some(slice) = buffer.as_slice_ptr() {
+                // SAFETY: the critical section above is held for the whole copy, so no other
+                // thread can release the buffer while the slice is alive.
+                let bytes: &[u8] = unsafe { slice.as_ref() };
+                ctx.write_int(bytes.len())?;
+                ctx.buf.put_u8(b':');
+                ctx.buf.extend_from_slice(bytes);
+                return Ok(());
+            }
+
+            let bytes = buffer.to_vec(py)?;
             ctx.write_int(bytes.len())?;
             ctx.buf.put_u8(b':');
-            ctx.buf.extend_from_slice(bytes);
-            return Ok(());
-        }
-
-        let bytes = buffer.to_vec(py)?;
-        ctx.write_int(bytes.len())?;
-        ctx.buf.put_u8(b':');
-        ctx.buf.put(bytes.as_slice());
-        return Ok(());
+            ctx.buf.put(bytes.as_slice());
+            Ok(())
+        });
     }
 
     // dataclasses support: check before raising "Unsupported type"
@@ -302,13 +307,17 @@ fn encode_int(ctx: &mut Context, value: &Bound<'_, PyAny>) -> PyResult<()> {
 fn encode_byte_array(ctx: &mut Context, value: &Bound<'_, PyAny>) -> PyResult<()> {
     let bytes = unsafe { value.cast_unchecked::<PyByteArray>() };
 
-    let b = unsafe { bytes.as_bytes() };
+    // Same as the buffer path: a bytearray can be resized or mutated by another thread unless
+    // its critical section is held while the contents are copied out.
+    with_critical_section(value, || {
+        let b = unsafe { bytes.as_bytes() };
 
-    ctx.write_int(b.len())?;
-    ctx.buf.put_u8(b':');
-    ctx.buf.put(b);
+        ctx.write_int(b.len())?;
+        ctx.buf.put_u8(b':');
+        ctx.buf.put(b);
 
-    Ok(())
+        Ok(())
+    })
 }
 
 fn encode_list<'py>(
