@@ -33,7 +33,14 @@ jobs:
       - run: cargo clippy --all-targets -- -D warnings
 
   all-ci-jobs:
-    needs: ['test', 'test-freethreaded', 'bench-cp', 'coverage', 'audit', 'lint']
+    needs: [
+      'test',
+      'test-freethreaded',
+      'bench-cp',
+      'coverage',
+      'audit',
+      'lint',
+    ]
     runs-on: ubuntu-slim
     steps:
       - run: echo 1
