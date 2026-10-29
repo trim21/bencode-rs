@@ -33,7 +33,7 @@ jobs:
       - run: cargo clippy --all-targets -- -D warnings
 
   all-ci-jobs:
-    needs: ['test', 'bench-cp', 'coverage', 'audit', 'lint']
+    needs: ['test', 'test-freethreaded', 'bench-cp', 'coverage', 'audit', 'lint']
     runs-on: ubuntu-slim
     steps:
       - run: echo 1
@@ -86,6 +86,36 @@ jobs:
       - run: uv pip install --no-cache --reinstall bencode-rs --no-index --find-links ./dist/ -vv
 
       - run: pytest -sv
+        env:
+          RUST_BACKTRACE: 'full'
+
+  test-freethreaded:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ['ubuntu-24.04', 'macos-15', 'windows-latest']
+
+    runs-on: '${{ matrix.os }}'
+
+    needs: [build]
+
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: wheel
+          path: dist
+
+      - name: Set up Python 3.14t
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.14t'
+
+      # the dev group pulls in packages without free-threaded wheels, the suite itself needs pytest only
+      - run: python -m pip install pytest
+      - run: python -m pip install --no-index --find-links ./dist/ --force-reinstall bencode-rs
+
+      - run: python -m pytest -sv tests --ignore=tests/bench.py
         env:
           RUST_BACKTRACE: 'full'
 

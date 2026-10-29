@@ -104,9 +104,67 @@ jobs:
           name: wheels-${{ runner.os }}-${{ matrix.platform.target }}
           path: dist
 
+  wheel-freethreaded:
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: macos-15
+            target: aarch64
+            py: arm64
+            manylinux: auto
+
+          - runner: windows-latest
+            target: x64
+            py: x64
+            manylinux: auto
+
+          - runner: ubuntu-24.04
+            target: x86_64
+            manylinux: auto
+          - runner: ubuntu-24.04-arm
+            target: aarch64
+            manylinux: auto
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-musl
+            manylinux: musllinux_1_2
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+            manylinux: musllinux_1_2
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: trim21/setup-rust@v0.0.2
+        if: ${{ runner.os != 'Linux' }}
+
+      # the manylinux images already ship the free-threaded interpreter
+      - uses: actions/setup-python@v7
+        if: ${{ runner.os != 'Linux' }}
+        with:
+          python-version: '3.14t'
+          architecture: ${{ matrix.platform.py }}
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.platform.target }}
+          args: --release --out dist --interpreter '3.14t'
+          manylinux: ${{ matrix.platform.manylinux }}
+
+      - run: ls -ahl dist
+        shell: bash
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v7
+        with:
+          name: wheels-freethreaded-${{ runner.os }}-${{ matrix.platform.target }}
+          path: dist
+
   merge-wheel-artifact:
     runs-on: ubuntu-26.04
-    needs: ['sdist', 'wheel']
+    needs: ['sdist', 'wheel', 'wheel-freethreaded']
     steps:
       - name: Merge Artifacts
         uses: actions/upload-artifact/merge@v7

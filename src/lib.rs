@@ -7,7 +7,7 @@ mod encode;
 
 use pyo3::prelude::*;
 
-#[pymodule()]
+#[pymodule(gil_used = false)]
 fn _bencode(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(encode::bencode, m)?)?;
     m.add_function(wrap_pyfunction!(decode::bdecode, m)?)?;
