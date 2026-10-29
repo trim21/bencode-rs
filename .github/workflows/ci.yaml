@@ -32,6 +32,12 @@ jobs:
       - uses: trim21/setup-rust@v0.0.2
       - run: cargo clippy --all-targets -- -D warnings
 
+  prek:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: trim21/actions/prek@master
+
   all-ci-jobs:
     needs: [
       'test',
@@ -40,6 +46,7 @@ jobs:
       'coverage',
       'audit',
       'lint',
+      'prek',
     ]
     runs-on: ubuntu-slim
     steps:
