@@ -19,7 +19,7 @@ jobs:
 
       - run: cargo fmt || true
       - run: cargo clippy --fix --allow-dirty || true
-      # hooks exit non-zero when they reformat files, autofix-ci/action below commits the result
+      # incomplete hook fixes are committed by autofix-ci/action below, the strict run lives in ci.yaml
       - uses: trim21/actions/prek@master
         continue-on-error: true
 
