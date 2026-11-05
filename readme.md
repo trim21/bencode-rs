@@ -63,3 +63,23 @@ bencode_rs.bdecode_relax(b"d1:ai1e1:ai2ee") == {b"a": 2}
 
 Everything else is still validated, `bdecode_relax` only relaxes dict key ordering and uniqueness.
 Don't use it to parse torrent files, duplicated keys make the info hash unstable.
+
+### Decode depth limit
+
+`bdecode` and `bdecode_relax` accept a keyword-only `max_depth` argument.
+`0` (the default) means no limit, while a positive value caps how many nested
+lists or dicts are allowed:
+
+```python
+import bencode_rs
+
+assert bencode_rs.bdecode(b"llee", max_depth=2) == [[]]
+
+try:
+    bencode_rs.bdecode(b"llee", max_depth=1)
+except bencode_rs.BencodeDecodeError:
+    pass
+```
+
+Set `max_depth` when decoding untrusted input to avoid a stack overflow from
+deeply nested documents. `bdecode` does not limit nesting depth by default.
