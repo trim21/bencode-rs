@@ -5,8 +5,6 @@ import collections
 import dataclasses
 import enum
 import sys
-import types
-from types import MappingProxyType
 from typing import Any, NamedTuple
 
 import pytest

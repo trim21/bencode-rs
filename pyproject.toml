@@ -45,5 +45,18 @@ features = [
   { feature = "pyo3/abi3-py311", python-version = ">=3.11" },
 ]
 
+[tool.ruff]
+target-version = 'py310'
+line-length = 88
+
+src = ['py', 'tests']
+
+[tool.ruff.lint]
+extend-select = ['UP', 'I', 'E', 'W', 'FA', 'ANN']
+ignore = ['ANN401', 'E721', 'E501']
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ['ANN']
+
 [tool.uv]
 package = false

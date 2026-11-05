@@ -1,15 +1,15 @@
 from ._bencode import (
-    bencode,
+    BencodeDecodeError,
     BencodeEncodeError,
     bdecode,
     bdecode_relax,
-    BencodeDecodeError,
+    bencode,
 )
 
 __all__ = [
-    "bencode",
+    "BencodeDecodeError",
     "BencodeEncodeError",
     "bdecode",
     "bdecode_relax",
-    "BencodeDecodeError",
+    "bencode",
 ]
