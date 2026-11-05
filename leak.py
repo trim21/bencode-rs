@@ -1,11 +1,10 @@
-import random
+import gc
+import secrets
 import sys
 import time
 import tracemalloc
-import gc
-import secrets
 
-from bencode_rs import BencodeEncodeError, bencode, bdecode, BencodeDecodeError
+from bencode_rs import BencodeDecodeError, bdecode, bencode
 
 help(bencode)
 help(bdecode)

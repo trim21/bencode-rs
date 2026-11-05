@@ -22,6 +22,7 @@ def test_import_keeps_gil_disabled():
     result = subprocess.run(
         [sys.executable, "-W", "error::RuntimeWarning", "-c", code],
         capture_output=True,
+        check=False,
     )
 
     assert result.returncode == 0, result.stderr.decode()
