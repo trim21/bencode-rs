@@ -171,3 +171,59 @@ def test_decode_relax_keys(raw: bytes, expected: Any):
 def test_decode_relax_still_rejects_invalid_input(raw: bytes):
     with pytest.raises(BencodeDecodeError):
         bdecode_relax(raw)
+
+
+def test_decode_depth_limit():
+    assert bdecode(b"le", max_depth=1) == []
+    assert bdecode(b"llee", max_depth=2) == [[]]
+    assert bdecode(b"li1ee", max_depth=1) == [1]
+
+    with pytest.raises(BencodeDecodeError, match="exceeded maximum decode depth"):
+        bdecode(b"llee", max_depth=1)
+
+
+def test_decode_depth_limit_dict():
+    raw = b"d1:ad1:bi1eee"
+    assert bdecode(raw, max_depth=2) == {b"a": {b"b": 1}}
+
+    with pytest.raises(BencodeDecodeError, match="exceeded maximum decode depth"):
+        bdecode(raw, max_depth=1)
+
+
+def test_decode_depth_zero_is_unlimited():
+    raw = b"l" * 1000 + b"e" * 1000
+
+    assert isinstance(bdecode(raw), list)
+    assert isinstance(bdecode(raw, max_depth=0), list)
+
+
+def test_decode_depth_does_not_count_siblings():
+    raw = b"l" + b"i1e" * 10000 + b"e"
+    assert bdecode(raw, max_depth=1) == [1] * 10000
+
+
+def test_decode_depth_limit_prevents_stack_overflow():
+    raw = b"l" * 100000 + b"e" * 100000
+
+    with pytest.raises(BencodeDecodeError, match="exceeded maximum decode depth"):
+        bdecode(raw, max_depth=100)
+
+
+def test_decode_relax_depth_limit():
+    assert bdecode_relax(b"d1:bi1e1:ai2ee", max_depth=1) == {b"b": 1, b"a": 2}
+
+    with pytest.raises(BencodeDecodeError, match="exceeded maximum decode depth"):
+        bdecode_relax(b"d1:ad1:bi1eee", max_depth=1)
+
+
+def test_decode_max_depth_must_be_unsigned():
+    with pytest.raises(TypeError):
+        bdecode(b"de", max_depth="1")  # type: ignore
+
+    with pytest.raises(OverflowError):
+        bdecode(b"de", max_depth=-1)
+
+
+def test_decode_max_depth_is_keyword_only():
+    with pytest.raises(TypeError):
+        bdecode(b"de", 1)  # type: ignore

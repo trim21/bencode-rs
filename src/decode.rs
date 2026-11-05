@@ -15,20 +15,22 @@ create_exception!(
 type DecodeError = BencodeDecodeError;
 
 #[pyfunction]
-#[pyo3(text_signature = "(b: Bytes, /)")]
-pub fn bdecode(b: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
-    bdecode_impl(b, false)
+#[pyo3(signature = (b, /, *, max_depth = 0))]
+#[pyo3(text_signature = "(b: Bytes, /, *, max_depth: int = 0)")]
+pub fn bdecode(b: &Bound<'_, PyAny>, max_depth: usize) -> PyResult<Py<PyAny>> {
+    bdecode_impl(b, false, max_depth)
 }
 
 /// Same as `bdecode`, but accepts unsorted and duplicated dict keys.
 /// The last occurrence of a duplicated key wins.
 #[pyfunction]
-#[pyo3(text_signature = "(b: Bytes, /)")]
-pub fn bdecode_relax(b: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
-    bdecode_impl(b, true)
+#[pyo3(signature = (b, /, *, max_depth = 0))]
+#[pyo3(text_signature = "(b: Bytes, /, *, max_depth: int = 0)")]
+pub fn bdecode_relax(b: &Bound<'_, PyAny>, max_depth: usize) -> PyResult<Py<PyAny>> {
+    bdecode_impl(b, true, max_depth)
 }
 
-fn bdecode_impl(b: &Bound<'_, PyAny>, relax: bool) -> PyResult<Py<PyAny>> {
+fn bdecode_impl(b: &Bound<'_, PyAny>, relax: bool, max_depth: usize) -> PyResult<Py<PyAny>> {
     let Ok(buf) = b.cast::<PyBytes>() else {
         return Err(PyTypeError::new_err("can only decode bytes"));
     };
@@ -44,9 +46,10 @@ fn bdecode_impl(b: &Bound<'_, PyAny>, relax: bool) -> PyResult<Py<PyAny>> {
         index: 0,
         py: b.py(),
         relax,
+        max_depth,
     };
 
-    match ctx.decode_any() {
+    match ctx.decode_any(0) {
         Ok(object) => {
             if ctx.index != size {
                 return Err(DecodeError::new_err(format!(
@@ -67,10 +70,20 @@ struct Decoder<'a> {
     py: Python<'a>,
     // allow unsorted and duplicated dict keys, which some non-conforming trackers return
     relax: bool,
+    // 0 means no limit
+    max_depth: usize,
 }
 
 impl<'a> Decoder<'a> {
-    fn decode_any(&mut self) -> Result<Py<PyAny>, PyErr> {
+    fn check_depth(&self, depth: usize) -> PyResult<()> {
+        if self.max_depth != 0 && depth > self.max_depth {
+            return Err(DecodeError::new_err("exceeded maximum decode depth"));
+        }
+
+        Ok(())
+    }
+
+    fn decode_any(&mut self, depth: usize) -> Result<Py<PyAny>, PyErr> {
         match self.current_byte()? {
             b'i' => self.decode_int(),
             b'0'..=b'9' => {
@@ -79,11 +92,11 @@ impl<'a> Decoder<'a> {
                 Ok(PyBytes::new(self.py, bytes).unbind().into_any())
             }
             b'l' => {
-                let list = self.decode_list()?;
+                let list = self.decode_list(depth.saturating_add(1))?;
 
                 Ok(list.into_any())
             }
-            b'd' => self.decode_dict(),
+            b'd' => self.decode_dict(depth.saturating_add(1)),
             _ => Err(DecodeError::new_err("invalid leading byte")),
         }
     }
@@ -258,7 +271,8 @@ impl<'a> Decoder<'a> {
         }
     }
 
-    fn decode_list(&mut self) -> PyResult<Py<PyAny>> {
+    fn decode_list(&mut self, depth: usize) -> PyResult<Py<PyAny>> {
+        self.check_depth(depth)?;
         self.index += 1;
         let mut l = smallvec::SmallVec::<[Py<PyAny>; 8]>::new();
 
@@ -271,7 +285,7 @@ impl<'a> Decoder<'a> {
                 }
                 Some(b'e') => break,
                 Some(_) => {
-                    l.push(self.decode_any()?);
+                    l.push(self.decode_any(depth)?);
                 }
             }
         }
@@ -281,7 +295,8 @@ impl<'a> Decoder<'a> {
         Ok(PyList::new(self.py, l)?.unbind().into_any())
     }
 
-    fn decode_dict(&mut self) -> Result<Py<PyAny>, PyErr> {
+    fn decode_dict(&mut self, depth: usize) -> Result<Py<PyAny>, PyErr> {
+        self.check_depth(depth)?;
         self.index += 1;
 
         let d = PyDict::new(self.py);
@@ -294,7 +309,7 @@ impl<'a> Decoder<'a> {
                 Some(b'e') => break,
                 Some(_) => {
                     let key = self.decode_bytes()?;
-                    let value = self.decode_any()?;
+                    let value = self.decode_any(depth)?;
 
                     let ck = Cow::from(key);
                     if !self.relax {
