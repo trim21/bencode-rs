@@ -2,7 +2,7 @@ from typing import Any
 
 import pytest
 
-from bencode_rs import BencodeDecodeError, bdecode
+from bencode_rs import BencodeDecodeError, bdecode, bdecode_relax
 
 
 def test_non_bytes_input():
@@ -113,3 +113,64 @@ def test_decode_int_no_digits_after_sign():
     """'i-e' should raise DecodeError, not silently return 0."""
     with pytest.raises(BencodeDecodeError):
         bdecode(b"i-e")
+
+
+# announce response from an XBT tracker, keys are not sorted
+UNSORTED_ANNOUNCE = (
+    b"d8:intervali1800e12:min intervali900e5:peers"
+    + b"108:"
+    + b"\x00" * 108
+    + b"8:completei18e10:incompletei0ee"
+)
+
+
+def test_decode_relax_unsorted_keys():
+    with pytest.raises(BencodeDecodeError):
+        bdecode(UNSORTED_ANNOUNCE)
+
+    assert bdecode_relax(UNSORTED_ANNOUNCE) == {
+        b"interval": 1800,
+        b"min interval": 900,
+        b"peers": b"\x00" * 108,
+        b"complete": 18,
+        b"incomplete": 0,
+    }
+
+
+@pytest.mark.parametrize(
+    ["raw", "expected"],
+    [
+        # last duplicated key wins
+        (b"d3:keyi1e3:keyi2ee", {b"key": 2}),
+        # duplicated key out of order
+        (b"d1:ai1e1:bi2e1:ai3ee", {b"a": 3, b"b": 2}),
+        # unsorted keys in nested dict
+        (b"d1:ad1:ci1e1:bi2ee1:zi0ee", {b"a": {b"c": 1, b"b": 2}, b"z": 0}),
+        # unsorted keys in dict inside list
+        (b"ld1:bi1e1:ai2eee", [{b"b": 1, b"a": 2}]),
+    ],
+)
+def test_decode_relax_keys(raw: bytes, expected: Any):
+    with pytest.raises(BencodeDecodeError):
+        bdecode(raw)
+
+    assert bdecode_relax(raw) == expected
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        b"",
+        b"1a:",
+        b"01:q",
+        b"i-0e",
+        b"i-e",
+        b"d3:keyi1e",  # truncated dict
+        b"d-3:keyi1e3:keai2ee",  # invalid key length prefix
+        b"d3:keyi1e3:keyi2e",  # truncated dict with duplicated keys
+        b"d3:keyi1eeextra",  # trailing bytes
+    ],
+)
+def test_decode_relax_still_rejects_invalid_input(raw: bytes):
+    with pytest.raises(BencodeDecodeError):
+        bdecode_relax(raw)

@@ -43,3 +43,23 @@ so we decode bencode bytes to python `bytes`, since it may not be a utf-8 string
 |            dataclasses            |  dictionary  |
 
 Also, we encode python `True` as int `1` and `False` as int 0.
+
+### Relaxed decoding
+
+`bdecode` rejects dict keys that are not sorted or that are duplicated, as the spec requires.
+Some trackers do not follow that rule, so `bdecode_relax` accepts such dicts:
+
+```python
+import bencode_rs
+
+# `complete` is not sorted after `peers`
+bencode_rs.bdecode_relax(b"d5:peersi1e8:completei0ee") == {
+    b"peers": 1,
+    b"complete": 0,
+}
+# the last duplicated key wins
+bencode_rs.bdecode_relax(b"d1:ai1e1:ai2ee") == {b"a": 2}
+```
+
+Everything else is still validated, `bdecode_relax` only relaxes dict key ordering and uniqueness.
+Don't use it to parse torrent files, duplicated keys make the info hash unstable.

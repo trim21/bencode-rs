@@ -17,6 +17,18 @@ type DecodeError = BencodeDecodeError;
 #[pyfunction]
 #[pyo3(text_signature = "(b: Bytes, /)")]
 pub fn bdecode(b: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+    bdecode_impl(b, false)
+}
+
+/// Same as `bdecode`, but accepts unsorted and duplicated dict keys.
+/// The last occurrence of a duplicated key wins.
+#[pyfunction]
+#[pyo3(text_signature = "(b: Bytes, /)")]
+pub fn bdecode_relax(b: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+    bdecode_impl(b, true)
+}
+
+fn bdecode_impl(b: &Bound<'_, PyAny>, relax: bool) -> PyResult<Py<PyAny>> {
     let Ok(buf) = b.cast::<PyBytes>() else {
         return Err(PyTypeError::new_err("can only decode bytes"));
     };
@@ -31,6 +43,7 @@ pub fn bdecode(b: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         bytes: buf.as_bytes(),
         index: 0,
         py: b.py(),
+        relax,
     };
 
     match ctx.decode_any() {
@@ -52,6 +65,8 @@ struct Decoder<'a> {
     bytes: &'a [u8],
     index: usize, // any torrent file larger than 4GiB?
     py: Python<'a>,
+    // allow unsorted and duplicated dict keys, which some non-conforming trackers return
+    relax: bool,
 }
 
 impl<'a> Decoder<'a> {
@@ -282,24 +297,26 @@ impl<'a> Decoder<'a> {
                     let value = self.decode_any()?;
 
                     let ck = Cow::from(key);
-                    if let Some(lk) = last_key {
-                        if lk > ck {
-                            return Err(DecodeError::new_err(format!(
-                                "dict key not sorted. index {}",
-                                self.index
-                            )));
-                        }
+                    if !self.relax {
+                        if let Some(lk) = last_key.as_ref() {
+                            if lk > &ck {
+                                return Err(DecodeError::new_err(format!(
+                                    "dict key not sorted. index {}",
+                                    self.index
+                                )));
+                            }
 
-                        if lk == ck {
-                            return Err(DecodeError::new_err(format!(
-                                "duplicated dict key found: index {}",
-                                self.index
-                            )));
+                            if lk == &ck {
+                                return Err(DecodeError::new_err(format!(
+                                    "duplicated dict key found: index {}",
+                                    self.index
+                                )));
+                            }
                         }
+                        last_key = Some(ck.clone());
                     }
-                    d.set_item(ck.clone(), value)?;
-                    // map.insert(ck.clone(), value);
-                    last_key = Some(ck);
+
+                    d.set_item(ck, value)?;
                 }
             }
         }
