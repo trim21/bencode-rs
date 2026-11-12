@@ -5,7 +5,7 @@ build-backend = "maturin"
 [project]
 name = "bencode-rs"
 version = "0.1.0"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 description = "a bencode parser build with pyo3"
 readme = "readme.md"
 classifiers = [
@@ -15,11 +15,6 @@ classifiers = [
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
-  "Programming Language :: Python :: 3.13",
-  "Programming Language :: Python :: 3.14",
   "Programming Language :: Python :: Implementation :: CPython",
 ]
 keywords = ["bittorrent", "bencode", "p2p"]
@@ -29,24 +24,20 @@ Homepage = 'https://github.com/trim21/bencode-rs'
 
 [dependency-groups]
 dev = [
-  "abi3audit>=0.0.26,<1.0",
-  "maturin>=1.16.0,<1.16.1",
-  "pytest>=9.2.0,<9.3",
+  "abi3audit==0.0.26",
+  "maturin==1.16.0",
+  "pytest==9.2.0",
   "pytest-codspeed==5.0.4",
   "pytest-github-actions-annotate-failures==0.4.2",
-  "twine>=7.0.0",
+  "twine==7.0.0",
 ]
 
 [tool.maturin]
 module-name = "bencode_rs._bencode"
 python-source = "py"
-# we need PyBuffer which is stable since 3.11
-features = [
-  { feature = "pyo3/abi3-py311", python-version = ">=3.11" },
-]
 
 [tool.ruff]
-target-version = 'py310'
+target-version = 'py311'
 line-length = 88
 
 src = ['py', 'tests']

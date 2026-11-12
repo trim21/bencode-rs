@@ -59,7 +59,6 @@ jobs:
       matrix:
         os: ['ubuntu-24.04', 'macos-15', 'windows-latest']
         python-version:
-          - '3.10'
           - '3.11'
           - '3.12'
           - '3.13'
@@ -205,7 +204,6 @@ jobs:
     strategy:
       matrix:
         python-version:
-          - '3.10'
           - '3.11'
           - '3.12'
           - '3.13'
@@ -243,11 +241,7 @@ jobs:
           set -euxo pipefail
           source <(cargo llvm-cov show-env --export-prefix)
           export CARGO_TARGET_DIR=$CARGO_LLVM_COV_TARGET_DIR
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then
-            maturin develop --uv --no-default-features
-          else
-            maturin develop --uv
-          fi
+          maturin develop --uv
           pytest tests
           cargo llvm-cov report --lcov --output-path coverage.lcov
 
