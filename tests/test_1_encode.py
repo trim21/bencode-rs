@@ -4,7 +4,6 @@ import array
 import collections
 import dataclasses
 import enum
-import sys
 from typing import Any, NamedTuple
 
 import pytest
@@ -201,7 +200,7 @@ def test_enum():
     with pytest.raises(TypeError):
         bencode(Enum.v)
 
-    class StrEnum(str, enum.Enum):
+    class StrEnum(str, enum.Enum):  # noqa: UP042
         v = "a"
 
     assert bencode(StrEnum.v) == b"1:a"
@@ -219,7 +218,6 @@ def test_enum():
     assert bencode(IntEnum.b) == b"i18446744073709551616e"
 
 
-@pytest.mark.skipif(sys.version_info < (3, 11), reason="enum.StrEnum need py>=3.11")
 def test_str_enum():
     class EnumStr(enum.StrEnum):
         v = "s"
