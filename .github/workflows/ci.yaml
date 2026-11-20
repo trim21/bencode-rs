@@ -23,14 +23,14 @@ jobs:
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
-      - uses: trim21/setup-rust@v0.0.2
+      - uses: trim21/setup-rust@v0.0.3
       - run: cargo fmt --check --all
 
   lint:
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
-      - uses: trim21/setup-rust@v0.0.2
+      - uses: trim21/setup-rust@v0.0.3
       - run: cargo clippy --all-targets -- -D warnings
 
   prek:
@@ -81,7 +81,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v10.3.3
+        uses: astral-sh/setup-uv@v10.4.0
         with:
           enable-cache: true
           activate-environment: true
@@ -144,7 +144,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
-      - uses: trim21/setup-rust@v0.0.2
+      - uses: trim21/setup-rust@v0.0.3
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v7
@@ -152,7 +152,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v10.3.3
+        uses: astral-sh/setup-uv@v10.4.0
         with:
           enable-cache: true
           activate-environment: true
@@ -184,7 +184,7 @@ jobs:
           python-version: '3.15.2'
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v10.3.3
+        uses: astral-sh/setup-uv@v10.4.0
         with:
           enable-cache: true
           activate-environment: true
@@ -219,12 +219,12 @@ jobs:
           python-version: '${{ matrix.python-version }}'
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v10.3.3
+        uses: astral-sh/setup-uv@v10.4.0
         with:
           enable-cache: true
           activate-environment: true
 
-      - uses: trim21/setup-rust@v0.0.2
+      - uses: trim21/setup-rust@v0.0.3
         with:
           components: llvm-tools
 
